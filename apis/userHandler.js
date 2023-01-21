@@ -19,25 +19,21 @@ router.post('/register', async (req, res, next) => {
       !lastName ||
       !phoneNumber
     )
-      return res.json({
+      return res.status(422).json({
         success: false,
         message: "Enter all fields' values!",
       });
-
-    if (password.length < 6) {
-      return res.json({
-        success: false,
-        message: 'Password is too short!',
-      });
-    }
+    ``;
 
     if (password != passwordCheck)
-      return res.json({ success: false, message: 'Passwords do not match!' });
+      return res
+        .status(422)
+        .json({ success: false, message: 'Passwords do not match!' });
 
     const existingUser = await User.findOne({ email });
 
     if (existingUser)
-      return res.json({
+      return res.status(409).json({
         success: false,
         message: 'Email ID already exist!',
       });
@@ -51,20 +47,15 @@ router.post('/register', async (req, res, next) => {
       lastName,
       firstName,
     });
-    const response = await newUser.save();
 
-    res.json({
+    await newUser.save();
+
+    res.status(200).json({
       message: 'User Registered!',
       success: true,
-      user: response,
     });
   } catch (error) {
     console.log(error);
-
-    res.json({
-      success: false,
-      message: 'An error occurred!',
-    });
 
     next(error);
   }
@@ -75,56 +66,33 @@ router.post('/login', async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password)
-      return res.json({
+      return res.status(422).json({
         success: false,
         message: 'Enter all fields!',
       });
 
-    const user = await User.findOne({ email }).select('-password');
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user)
-      return res.json({ success: false, message: 'User does not exist!' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'User does not exist!' });
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch)
-      return res.json({ success: false, message: 'Invalid Credentials!' });
+      return res
+        .status(401)
+        .json({ success: false, message: 'Invalid Credentials!' });
 
     const token = jwt.sign({ id: user._id }, process.env.secretKey);
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: 'Logged In!',
       user,
       token,
     });
-  } catch (error) {
-    console.log(error);
-
-    res.json({
-      success: false,
-      message: 'An error occurred!',
-    });
-
-    next(error);
-  }
-});
-
-router.post('/tokenIsValid', auth, async (req, res, next) => {
-  try {
-    const token = req.header('x-auth-token');
-
-    if (!token) return res.json(false);
-
-    const verified = jwt.verify(token, process.env.secretKey);
-
-    if (!verified) return res.json(false);
-
-    const user = await User.findById(verified.id);
-
-    if (!user) return res.json(false);
-
-    res.json(true);
   } catch (error) {
     console.log(error);
 
@@ -134,29 +102,14 @@ router.post('/tokenIsValid', auth, async (req, res, next) => {
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user);
-
-    if (!user) return res.json({ success: false, message: 'User not found!' });
-
-    res.json({
-      success: true,
-      user,
-    });
-  } catch (error) {
-    console.log(error);
-
-    next(error);
-  }
-});
-
-router.get('/users', auth, async (req, res, next) => {
-  try {
     const users = await User.find();
 
     if (!users)
-      return res.json({ success: false, message: 'No users were found!' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'No users were found!' });
 
-    res.json({
+    res.status(200).json({
       success: true,
       users,
     });
@@ -172,16 +125,17 @@ router.get('/:id', auth, async (req, res, next) => {
     const { id } = req.params;
     const user = await User.findById(id);
 
-    if (!user) return res.json({ success: false, message: 'User not found!' });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: 'User not found!' });
 
-    res.json({
+    res.status(200).json({
       success: true,
       user,
     });
   } catch (error) {
     console.log(error);
-
-    res.json({ success: false, message: 'User not found!' });
 
     next(error);
   }
@@ -190,17 +144,15 @@ router.get('/:id', auth, async (req, res, next) => {
 router.delete('/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
 
-    res.json({
+    await User.findByIdAndDelete(id);
+
+    res.status(200).json({
       success: true,
-      user,
       message: 'User deleted!',
     });
   } catch (error) {
     console.log(error);
-
-    res.json({ success: false, message: 'An error occurred!' });
 
     next(error);
   }
@@ -217,20 +169,17 @@ router.put('/:id', auth, async (req, res, next) => {
       });
 
     if (!user) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: 'User not found!',
       });
     }
 
-    res.json({ success: true, message: 'User Updated!', user });
+    res.status(200).json({ success: true, message: 'User Updated!', user });
   } catch (error) {
     console.log(error);
 
-    res.json({
-      success: false,
-      message: 'User not found!',
-    });
+    next(error);
   }
 });
 
@@ -238,45 +187,44 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params,
       updUser = req.body,
-      oldUser = await User.findById(id).select('password'),
+      oldUser = await User.findById(id).select('+password'),
       isMatch = await bcrypt.compare(updUser.oldPassword, oldUser.password);
 
     if (!isMatch)
-      return res.json({
+      return res.status(422).json({
         success: false,
         message: 'Old password is incorrect!',
       });
 
     if (updUser.password != updUser.passwordCheck)
-      return res.json({ success: false, message: 'Passwords not matched' });
+      return res
+        .status(422)
+        .json({ success: false, message: 'Passwords not matched!' });
 
-    const salt = await bcrypt.genSalt();
-    const passwordHash = await bcrypt.hash(updUser.password, salt);
-    const user = await User.findByIdAndUpdate(
-      id,
-      { password: passwordHash },
-      {
-        new: true,
-        runValidators: true,
-        useFindAndModify: false,
-      },
-    );
+    const salt = await bcrypt.genSalt(),
+      passwordHash = await bcrypt.hash(updUser.password, salt),
+      user = await User.findByIdAndUpdate(
+        id,
+        { password: passwordHash },
+        {
+          new: true,
+          runValidators: true,
+          useFindAndModify: false,
+        },
+      );
 
     if (!user) {
-      return res.json({
+      return res.status(422).json({
         success: false,
-        message: 'An error occurred!',
+        message: 'Password could not be updated!',
       });
     }
 
-    res.json({ success: true, message: 'Password Updated!', user });
+    res.status(200).json({ success: true, message: 'Password Updated!', user });
   } catch (error) {
     console.log(error);
 
-    res.json({
-      success: false,
-      message: 'An error occurred!',
-    });
+    next(error);
   }
 });
 
