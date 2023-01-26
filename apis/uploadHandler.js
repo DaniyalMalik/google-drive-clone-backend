@@ -117,7 +117,7 @@ router.get('/', auth, async (req, res, next) => {
     for (let i = 0; i < files.length; i++) {
       const readFile = util.promisify(fs.readFile);
 
-      promises.push(readFile(path.join(user.folderPath, files[i])));
+      promises.push(readFile(path.join(user.folderPath, files[i]), 'utf8'));
     }
 
     const result = await Promise.all(promises);
@@ -138,7 +138,7 @@ router.delete('/', auth, async (req, res, next) => {
     const { fileName } = req.query;
     const user = await User.findById(req.user);
     const unlink = util.promisify(fs.unlink);
-    
+
     await unlink(path.join(user.folderPath, fileName));
 
     res.status(200).json({

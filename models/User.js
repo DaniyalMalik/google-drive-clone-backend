@@ -21,10 +21,6 @@ const mongoose = require('mongoose'),
         type: String,
         required: [true, 'Last name is required!'],
       },
-      phoneNumber: {
-        required: [true, 'Phone Number is required!'],
-        type: String,
-      },
       folderPath: {
         type: String,
       },

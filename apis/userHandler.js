@@ -8,17 +8,9 @@ const express = require('express'),
 // register a new user
 router.post('/register', async (req, res, next) => {
   try {
-    const { password, passwordCheck, firstName, email, lastName, phoneNumber } =
-      req.body;
+    const { password, passwordCheck, firstName, email, lastName } = req.body;
 
-    if (
-      !password ||
-      !passwordCheck ||
-      !firstName ||
-      !email ||
-      !lastName ||
-      !phoneNumber
-    )
+    if (!password || !passwordCheck || !firstName || !email || !lastName)
       return res.status(422).json({
         success: false,
         message: "Enter all fields' values!",
@@ -43,7 +35,6 @@ router.post('/register', async (req, res, next) => {
     const newUser = new User({
       password: passwordHash,
       email,
-      phoneNumber,
       lastName,
       firstName,
     });
