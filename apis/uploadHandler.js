@@ -5,7 +5,9 @@ const express = require('express'),
   { auth } = require('../middleware/auth'),
   fs = require('fs'),
   User = require('../models/User'),
-  util = require('util');
+  util = require('util'),
+  // mime = require('mime-types');
+  mime = require('mime');
 
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
@@ -111,20 +113,27 @@ router.get('/', auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user);
     const readdir = util.promisify(fs.readdir);
-    const files = await readdir(user.folderPath);
-    const promises = [];
+    const rawFiles = await readdir(user.folderPath);
+    const files = [];
+    let file;
 
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < rawFiles.length; i++) {
       const readFile = util.promisify(fs.readFile);
 
-      promises.push(readFile(path.join(user.folderPath, files[i]), 'utf8'));
-    }
+      file = await readFile(path.join(user.folderPath, rawFiles[i]));
 
-    const result = await Promise.all(promises);
+      files.push({
+        file: file.toString('base64'),
+        mimeType: mime.getType(
+          path.basename(path.join(user.folderPath, rawFiles[i])),
+        ),
+        fileName: path.basename(path.join(user.folderPath, rawFiles[i])),
+      });
+    }
 
     res.status(200).json({
       success: true,
-      files: result,
+      files,
     });
   } catch (error) {
     console.log(error);
