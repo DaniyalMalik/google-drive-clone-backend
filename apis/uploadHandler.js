@@ -127,7 +127,11 @@ router.get('/', auth, async (req, res, next) => {
         mimeType: mime.getType(
           path.basename(path.join(user.folderPath, rawFiles[i])),
         ),
-        fileName: path.basename(path.join(user.folderPath, rawFiles[i])),
+        fileName: path.basename(
+          path.join(user.folderPath, rawFiles[i]),
+          path.extname(path.join(user.folderPath, rawFiles[i])),
+        ),
+        fileNameWithExt: path.basename(path.join(user.folderPath, rawFiles[i])),
       });
     }
 
