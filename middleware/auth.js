@@ -17,7 +17,7 @@ const jwt = require('jsonwebtoken'),
           .status(401)
           .json({ message: 'No authentication token, access denied.' });
 
-      const verified = jwt.verify(token, process.env.secretKey);
+      const verified = jwt.verify(token, process.env.JWT_SECRET);
 
       if (!verified)
         return res

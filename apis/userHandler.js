@@ -76,33 +76,13 @@ router.post('/login', async (req, res, next) => {
         .status(401)
         .json({ success: false, message: 'Invalid Credentials!' });
 
-    const token = jwt.sign({ id: user._id }, process.env.secretKey);
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
     res.status(200).json({
       success: true,
       message: 'Logged In!',
       user,
       token,
-    });
-  } catch (error) {
-    console.log(error);
-
-    next(error);
-  }
-});
-
-router.get('/', auth, async (req, res, next) => {
-  try {
-    const users = await User.find();
-
-    if (!users)
-      return res
-        .status(404)
-        .json({ success: false, message: 'No users were found!' });
-
-    res.status(200).json({
-      success: true,
-      users,
     });
   } catch (error) {
     console.log(error);
