@@ -90,9 +90,9 @@ const storage = multer.diskStorage({
   }),
   upload = multer({ storage });
 
-router.post('/', [auth, upload.single('file')], (req, res, next) => {
+router.post('/', [auth, upload.array('files')], (req, res, next) => {
   try {
-    if (!req.file)
+    if (!req.files)
       return res.status(422).json({
         success: false,
         message: 'You must select a file!',
@@ -100,7 +100,7 @@ router.post('/', [auth, upload.single('file')], (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'File Uploaded Successfully!',
+      message: 'Folder or File Uploaded Successfully!',
     });
   } catch (error) {
     console.log(error);
