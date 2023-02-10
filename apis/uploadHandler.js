@@ -6,15 +6,15 @@ const express = require('express'),
   fs = require('fs'),
   User = require('../models/User'),
   util = require('util'),
-  // mime = require('mime-types');
   mime = require('mime');
 
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
+      const { folderName } = req.query;
+      const mkdir = util.promisify(fs.mkdir);
       let user;
 
       if (!fs.existsSync(path.resolve('../google-drive-storage'))) {
-        const mkdir = util.promisify(fs.mkdir);
         const promises = [];
 
         promises.push(mkdir(path.resolve('../google-drive-storage')));
@@ -36,7 +36,6 @@ const storage = multer.diskStorage({
             ),
           )
         ) {
-          const mkdir = util.promisify(fs.mkdir);
           const promises = [];
 
           promises.push(
@@ -67,13 +66,30 @@ const storage = multer.diskStorage({
           await Promise.all(promises);
         }
 
-        cb(
-          null,
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}`,
-          ),
-        );
+        if (folderName) {
+          mkdir(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+            ),
+          );
+
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+            ),
+          );
+        } else {
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}`,
+            ),
+          );
+        }
       } else {
         return res
           .status(404)
@@ -111,28 +127,56 @@ router.post('/', [auth, upload.array('files')], (req, res, next) => {
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user);
-    const readdir = util.promisify(fs.readdir);
-    const rawFiles = await readdir(user.folderPath);
-    const files = [];
+    const { folderName } = req.query,
+      user = await User.findById(req.user),
+      readdir = util.promisify(fs.readdir),
+      rawFiles = await readdir(
+        folderName ? path.join(user.folderPath, folderName) : user.folderPath,
+      ),
+      files = [],
+      folders = [];
     let file;
 
     for (let i = 0; i < rawFiles.length; i++) {
       const readFile = util.promisify(fs.readFile);
 
-      file = await readFile(path.join(user.folderPath, rawFiles[i]));
+      if (rawFiles[i].split('.').length === 2) {
+        file = await readFile(
+          folderName
+            ? path.join(user.folderPath, folderName, rawFiles[i])
+            : path.join(user.folderPath, rawFiles[i]),
+        );
 
-      files.push({
-        file: file.toString('base64'),
-        mimeType: mime.getType(
-          path.basename(path.join(user.folderPath, rawFiles[i])),
-        ),
-        fileName: path.basename(
-          path.join(user.folderPath, rawFiles[i]),
-          path.extname(path.join(user.folderPath, rawFiles[i])),
-        ),
-        fileNameWithExt: path.basename(path.join(user.folderPath, rawFiles[i])),
-      });
+        files.push({
+          file: file.toString('base64'),
+          mimeType: mime.getType(
+            path.basename(
+              folderName
+                ? path.join(user.folderPath, folderName, rawFiles[i])
+                : path.join(user.folderPath, rawFiles[i]),
+            ),
+          ),
+          fileName: path.basename(
+            folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
+            path.extname(
+              folderName
+                ? path.join(user.folderPath, folderName, rawFiles[i])
+                : path.join(user.folderPath, rawFiles[i]),
+            ),
+          ),
+          fileNameWithExt: path.basename(
+            folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
+          ),
+        });
+      } else {
+        folders.push({
+          fileName: rawFiles[i],
+        });
+      }
     }
 
     res.status(200).json({
@@ -148,11 +192,11 @@ router.get('/', auth, async (req, res, next) => {
 
 router.delete('/', auth, async (req, res, next) => {
   try {
-    const { fileName } = req.query;
+    const { fileOrFolderName } = req.query;
     const user = await User.findById(req.user);
     const unlink = util.promisify(fs.unlink);
 
-    await unlink(path.join(user.folderPath, fileName));
+    await unlink(path.join(user.folderPath, fileOrFolderName));
 
     res.status(200).json({
       success: true,
