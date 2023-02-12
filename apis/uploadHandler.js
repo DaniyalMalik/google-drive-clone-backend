@@ -91,9 +91,7 @@ const storage = multer.diskStorage({
           );
         }
       } else {
-        return res
-          .status(404)
-          .json({ success: false, message: 'User not found!' });
+        return res.json({ success: false, message: 'User not found!' });
       }
     },
     filename: function (req, file, cb) {
@@ -109,17 +107,53 @@ const storage = multer.diskStorage({
 router.post('/', [auth, upload.array('files')], (req, res, next) => {
   try {
     if (!req.files)
-      return res.status(422).json({
+      return res.json({
         success: false,
         message: 'You must select a file!',
       });
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: 'Folder or File Uploaded Successfully!',
+      message: 'Uploaded Successfully!',
     });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: error,
+    });
+
+    next(error);
+  }
+});
+
+router.post('/create', auth, async (req, res, next) => {
+  try {
+    const { folderName } = req.body,
+      mkdir = util.promisify(fs.mkdir),
+      user = await User.findById(req.user);
+
+    if (!fs.existsSync(path.resolve(path.join(user.folderPath, folderName)))) {
+      await mkdir(path.resolve(path.join(user.folderPath, folderName)));
+
+      res.json({
+        success: true,
+        message: 'Folder Created Successfully!',
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Folder already exists!',
+      });
+    }
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: error,
+    });
 
     next(error);
   }
@@ -174,17 +208,23 @@ router.get('/', auth, async (req, res, next) => {
         });
       } else {
         folders.push({
-          fileName: rawFiles[i],
+          folderName: rawFiles[i],
         });
       }
     }
 
-    res.status(200).json({
+    res.json({
       success: true,
       files,
+      folders,
     });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: error,
+    });
 
     next(error);
   }
@@ -198,12 +238,17 @@ router.delete('/', auth, async (req, res, next) => {
 
     await unlink(path.join(user.folderPath, fileOrFolderName));
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'File deleted successfully!',
     });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: error,
+    });
 
     next(error);
   }

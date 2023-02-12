@@ -11,21 +11,19 @@ router.post('/register', async (req, res, next) => {
     const { password, passwordCheck, firstName, email, lastName } = req.body;
 
     if (!password || !passwordCheck || !firstName || !email || !lastName)
-      return res.status(422).json({
+      return res.json({
         success: false,
         message: "Enter all fields' values!",
       });
     ``;
 
     if (password != passwordCheck)
-      return res
-        .status(422)
-        .json({ success: false, message: 'Passwords do not match!' });
+      return res.json({ success: false, message: 'Passwords do not match!' });
 
     const existingUser = await User.findOne({ email });
 
     if (existingUser)
-      return res.status(409).json({
+      return res.json({
         success: false,
         message: 'Email ID already exist!',
       });
@@ -41,7 +39,7 @@ router.post('/register', async (req, res, next) => {
 
     await newUser.save();
 
-    res.status(200).json({
+    res.json({
       message: 'User Registered!',
       success: true,
     });
@@ -57,7 +55,7 @@ router.post('/login', async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password)
-      return res.status(422).json({
+      return res.json({
         success: false,
         message: 'Enter all fields!',
       });
@@ -65,20 +63,16 @@ router.post('/login', async (req, res, next) => {
     const user = await User.findOne({ email }).select('+password');
 
     if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: 'User does not exist!' });
+      return res.json({ success: false, message: 'User does not exist!' });
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch)
-      return res
-        .status(401)
-        .json({ success: false, message: 'Invalid Credentials!' });
+      return res.json({ success: false, message: 'Invalid Credentials!' });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'Logged In!',
       user,
@@ -96,12 +90,9 @@ router.get('/:id', auth, async (req, res, next) => {
     const { id } = req.params;
     const user = await User.findById(id);
 
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: 'User not found!' });
+    if (!user) return res.json({ success: false, message: 'User not found!' });
 
-    res.status(200).json({
+    res.json({
       success: true,
       user,
     });
@@ -118,7 +109,7 @@ router.delete('/:id', auth, async (req, res, next) => {
 
     await User.findByIdAndDelete(id);
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'User deleted!',
     });
@@ -140,13 +131,13 @@ router.put('/:id', auth, async (req, res, next) => {
       });
 
     if (!user) {
-      return res.status(404).json({
+      return res.json({
         success: false,
         message: 'User not found!',
       });
     }
 
-    res.status(200).json({ success: true, message: 'User Updated!', user });
+    res.json({ success: true, message: 'User Updated!', user });
   } catch (error) {
     console.log(error);
 
@@ -162,15 +153,13 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
       isMatch = await bcrypt.compare(updUser.oldPassword, oldUser.password);
 
     if (!isMatch)
-      return res.status(422).json({
+      return res.json({
         success: false,
         message: 'Old password is incorrect!',
       });
 
     if (updUser.password != updUser.passwordCheck)
-      return res
-        .status(422)
-        .json({ success: false, message: 'Passwords not matched!' });
+      return res.json({ success: false, message: 'Passwords not matched!' });
 
     const salt = await bcrypt.genSalt(),
       passwordHash = await bcrypt.hash(updUser.password, salt),
@@ -185,13 +174,13 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
       );
 
     if (!user) {
-      return res.status(422).json({
+      return res.json({
         success: false,
         message: 'Password could not be updated!',
       });
     }
 
-    res.status(200).json({ success: true, message: 'Password Updated!', user });
+    res.json({ success: true, message: 'Password Updated!', user });
   } catch (error) {
     console.log(error);
 

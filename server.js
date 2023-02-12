@@ -8,8 +8,7 @@ const express = require('express'),
   uploadRoutes = require('./apis/uploadHandler'),
   connectDB = require('./config/db'),
   morgan = require('morgan'),
-  error = require('./middleware/error'),
-  { notFoundHandler } = require('./middleware/auth');
+  error = require('./middleware/error');
 
 dotenv.config({ path: 'config/config.env' });
 
@@ -19,7 +18,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use('/api/user', userRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use(notFoundHandler);
 app.use(error);
 
 const PORT = process.env.PORT || 5000,
