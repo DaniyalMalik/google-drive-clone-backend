@@ -10,88 +10,101 @@ const express = require('express'),
 
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
-      const { folderName } = req.query;
-      const mkdir = util.promisify(fs.mkdir);
-      let user;
+      try {
+        const { folderName } = req.query;
+        const mkdir = util.promisify(fs.mkdir);
+        let user;
 
-      if (!fs.existsSync(path.resolve('../google-drive-storage'))) {
-        const promises = [];
-
-        promises.push(mkdir(path.resolve('../google-drive-storage')));
-        promises.push(User.findById(req.user));
-
-        const result = await Promise.all(promises);
-
-        user = result[1];
-      } else {
-        user = await User.findById(req.user);
-      }
-
-      if (user) {
-        if (
-          !fs.existsSync(
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}`,
-            ),
-          )
-        ) {
+        if (!fs.existsSync(path.resolve('../google-drive-storage'))) {
           const promises = [];
 
-          promises.push(
-            mkdir(
+          promises.push(mkdir(path.resolve('../google-drive-storage')));
+          promises.push(User.findById(req.user));
+
+          const result = await Promise.all(promises);
+
+          user = result[1];
+        } else {
+          user = await User.findById(req.user);
+        }
+
+        if (user) {
+          if (
+            !fs.existsSync(
               path.join(
                 path.resolve('../google-drive-storage'),
                 `/${user.firstName}-${user.lastName}-${user._id}`,
               ),
-            ),
-          );
-          promises.push(
-            User.findByIdAndUpdate(
-              req.user,
-              {
-                folderPath: path.join(
+            )
+          ) {
+            const promises = [];
+
+            promises.push(
+              mkdir(
+                path.join(
                   path.resolve('../google-drive-storage'),
                   `/${user.firstName}-${user.lastName}-${user._id}`,
                 ),
-              },
-              {
-                new: true,
-                runValidators: true,
-                useFindAndModify: false,
-              },
-            ),
-          );
+              ),
+            );
+            promises.push(
+              User.findByIdAndUpdate(
+                req.user,
+                {
+                  folderPath: path.join(
+                    path.resolve('../google-drive-storage'),
+                    `/${user.firstName}-${user.lastName}-${user._id}`,
+                  ),
+                },
+                {
+                  new: true,
+                  runValidators: true,
+                  useFindAndModify: false,
+                },
+              ),
+            );
 
-          await Promise.all(promises);
+            await Promise.all(promises);
+          }
+
+          if (folderName) {
+            if (
+              !fs.existsSync(
+                path.join(
+                  path.resolve('../google-drive-storage'),
+                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+                ),
+              )
+            ) {
+              mkdir(
+                path.join(
+                  path.resolve('../google-drive-storage'),
+                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+                ),
+              );
+
+              cb(
+                null,
+                path.join(
+                  path.resolve('../google-drive-storage'),
+                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+                ),
+              );
+            } else {
+              cb(new Error('Folder already exists!'), false);
+            }
+          } else {
+            cb(
+              null,
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}`,
+              ),
+            );
+          }
         }
-
-        if (folderName) {
-          mkdir(
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-            ),
-          );
-
-          cb(
-            null,
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-            ),
-          );
-        } else {
-          cb(
-            null,
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}`,
-            ),
-          );
-        }
-      } else {
-        return res.json({ success: false, message: 'User not found!' });
+      } catch (error) {
+        console.log(error, 'here!');
       }
     },
     filename: function (req, file, cb) {

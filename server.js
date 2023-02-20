@@ -29,9 +29,3 @@ const PORT = process.env.PORT || 5000,
   );
 
 connectDB();
-
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`.red.bold);
-
-  server.close(() => process.exit(1));
-});
