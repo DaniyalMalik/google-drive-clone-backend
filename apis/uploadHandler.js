@@ -10,101 +10,107 @@ const express = require('express'),
 
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
-      try {
-        const { folderName } = req.query;
-        const mkdir = util.promisify(fs.mkdir);
-        let user;
+      const { folderName, sameFolder } = req.query;
+      const mkdir = util.promisify(fs.mkdir);
+      let user;
 
-        if (!fs.existsSync(path.resolve('../google-drive-storage'))) {
+      if (!fs.existsSync(path.resolve('../google-drive-storage'))) {
+        const promises = [];
+
+        promises.push(mkdir(path.resolve('../google-drive-storage')));
+        promises.push(User.findById(req.user));
+
+        const result = await Promise.all(promises);
+
+        user = result[1];
+      } else {
+        user = await User.findById(req.user);
+      }
+
+      if (user) {
+        if (
+          !fs.existsSync(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}`,
+            ),
+          )
+        ) {
           const promises = [];
 
-          promises.push(mkdir(path.resolve('../google-drive-storage')));
-          promises.push(User.findById(req.user));
+          promises.push(
+            mkdir(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}`,
+              ),
+            ),
+          );
+          promises.push(
+            User.findByIdAndUpdate(
+              req.user,
+              {
+                folderPath: path.join(
+                  path.resolve('../google-drive-storage'),
+                  `/${user.firstName}-${user.lastName}-${user._id}`,
+                ),
+              },
+              {
+                new: true,
+                runValidators: true,
+                useFindAndModify: false,
+              },
+            ),
+          );
 
-          const result = await Promise.all(promises);
-
-          user = result[1];
-        } else {
-          user = await User.findById(req.user);
+          await Promise.all(promises);
         }
 
-        if (user) {
+        if (folderName && !sameFolder && sameFolder == 'false') {
           if (
             !fs.existsSync(
               path.join(
                 path.resolve('../google-drive-storage'),
-                `/${user.firstName}-${user.lastName}-${user._id}`,
+                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
               ),
             )
           ) {
-            const promises = [];
-
-            promises.push(
-              mkdir(
-                path.join(
-                  path.resolve('../google-drive-storage'),
-                  `/${user.firstName}-${user.lastName}-${user._id}`,
-                ),
-              ),
-            );
-            promises.push(
-              User.findByIdAndUpdate(
-                req.user,
-                {
-                  folderPath: path.join(
-                    path.resolve('../google-drive-storage'),
-                    `/${user.firstName}-${user.lastName}-${user._id}`,
-                  ),
-                },
-                {
-                  new: true,
-                  runValidators: true,
-                  useFindAndModify: false,
-                },
+            mkdir(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
               ),
             );
 
-            await Promise.all(promises);
-          }
-
-          if (folderName) {
-            if (
-              !fs.existsSync(
-                path.join(
-                  path.resolve('../google-drive-storage'),
-                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-                ),
-              )
-            ) {
-              mkdir(
-                path.join(
-                  path.resolve('../google-drive-storage'),
-                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-                ),
-              );
-
-              cb(
-                null,
-                path.join(
-                  path.resolve('../google-drive-storage'),
-                  `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-                ),
-              );
-            } else {
-              cb(new Error('Folder already exists!'), false);
-            }
-          } else {
             cb(
               null,
               path.join(
                 path.resolve('../google-drive-storage'),
-                `/${user.firstName}-${user.lastName}-${user._id}`,
+                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
               ),
             );
+          } else {
+            return cb(new Error('Folder already exists!'), false);
           }
+        } else if (folderName && sameFolder == 'true') {
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+            ),
+          );
+        } else {
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}`,
+            ),
+          );
         }
-      } catch (error) {
-        console.log(error, 'here!');
+      } else {
+        return cb(new Error('User does not exist!'), false);
       }
     },
     filename: function (req, file, cb) {
@@ -115,22 +121,30 @@ const storage = multer.diskStorage({
       );
     },
   }),
-  upload = multer({ storage });
+  upload = multer({ storage }).array('files');
 
-router.post('/', [auth, upload.array('files')], (req, res, next) => {
+router.post('/', auth, (req, res, next) => {
   try {
-    if (!req.files)
-      return res.json({
-        success: false,
-        message: 'You must select a file!',
-      });
+    upload(req, res, (error) => {
+      if (!req.files)
+        return res.json({
+          success: false,
+          message: 'You must select a file!',
+        });
 
-    res.json({
-      success: true,
-      message: 'Uploaded Successfully!',
+      if (error)
+        return res.json({
+          success: false,
+          message: error.message,
+        });
+
+      res.json({
+        success: true,
+        message: 'Uploaded Successfully!',
+      });
     });
   } catch (error) {
-    console.log(error);
+    console.log(error, 'error');
 
     res.json({
       success: false,
