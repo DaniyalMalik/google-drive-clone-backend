@@ -26,7 +26,12 @@ const storage = multer.diskStorage({
       } else {
         user = await User.findById(req.user);
       }
-
+      console.log(
+        folderName,
+        sameFolder,
+        user,
+        'folderName, sameFolder, user!!!!!!!',
+      );
       if (user) {
         if (
           !fs.existsSync(
@@ -66,7 +71,7 @@ const storage = multer.diskStorage({
           await Promise.all(promises);
         }
 
-        if (folderName && !sameFolder && sameFolder == 'false') {
+        if (folderName && (!sameFolder || sameFolder == 'false')) {
           if (
             !fs.existsSync(
               path.join(
@@ -99,6 +104,7 @@ const storage = multer.diskStorage({
               path.resolve('../google-drive-storage'),
               `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
             ),
+            a,
           );
         } else {
           cb(
@@ -137,7 +143,7 @@ router.post('/', auth, (req, res, next) => {
           success: false,
           message: error.message,
         });
-
+      console.log(req.files, 'req.files');
       res.json({
         success: true,
         message: 'Uploaded Successfully!',
@@ -148,7 +154,7 @@ router.post('/', auth, (req, res, next) => {
 
     res.json({
       success: false,
-      message: error,
+      message: 'An error occurred!',
     });
 
     next(error);
@@ -179,7 +185,7 @@ router.post('/create', auth, async (req, res, next) => {
 
     res.json({
       success: false,
-      message: error,
+      message: 'An error occurred!',
     });
 
     next(error);
@@ -250,7 +256,7 @@ router.get('/', auth, async (req, res, next) => {
 
     res.json({
       success: false,
-      message: error,
+      message: 'An error occurred!',
     });
 
     next(error);
@@ -274,7 +280,7 @@ router.delete('/', auth, async (req, res, next) => {
 
     res.json({
       success: false,
-      message: error,
+      message: 'An error occurred!',
     });
 
     next(error);

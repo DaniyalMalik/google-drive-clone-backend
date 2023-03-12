@@ -46,6 +46,11 @@ router.post('/register', async (req, res, next) => {
   } catch (error) {
     console.log(error);
 
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+
     next(error);
   }
 });
@@ -81,23 +86,10 @@ router.post('/login', async (req, res, next) => {
   } catch (error) {
     console.log(error);
 
-    next(error);
-  }
-});
-
-router.get('/:id', auth, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-
-    if (!user) return res.json({ success: false, message: 'User not found!' });
-
     res.json({
-      success: true,
-      user,
+      success: false,
+      message: 'An error occurred!',
     });
-  } catch (error) {
-    console.log(error);
 
     next(error);
   }
@@ -115,6 +107,11 @@ router.delete('/:id', auth, async (req, res, next) => {
     });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
 
     next(error);
   }
@@ -140,6 +137,11 @@ router.put('/:id', auth, async (req, res, next) => {
     res.json({ success: true, message: 'User Updated!', user });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
 
     next(error);
   }
@@ -183,6 +185,11 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
     res.json({ success: true, message: 'Password Updated!', user });
   } catch (error) {
     console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
 
     next(error);
   }
