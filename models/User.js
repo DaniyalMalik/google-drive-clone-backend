@@ -18,8 +18,8 @@ const mongoose = require('mongoose'),
         required: [true, 'First name is required!'],
       },
       isEmailVerified: {
-        type: String,
-        required: [true, 'First name is required!'],
+        type: Boolean,
+        default: false,
       },
       lastName: {
         type: String,

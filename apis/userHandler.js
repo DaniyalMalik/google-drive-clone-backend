@@ -151,8 +151,10 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params,
       updUser = req.body,
-      oldUser = await User.findById(id).select('+password'),
+      oldUser = await User.findById(id).select('password'),
       isMatch = await bcrypt.compare(updUser.oldPassword, oldUser.password);
+    console.log(updUser.oldPassword, 'updUser.oldPassword');
+    console.log(oldUser.password, 'oldUser.password');
 
     if (!isMatch)
       return res.json({
