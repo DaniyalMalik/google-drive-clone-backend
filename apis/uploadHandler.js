@@ -95,7 +95,7 @@ const storage = multer.diskStorage({
               ),
             );
           } else {
-            return cb(new Error('Folder already exists!'), false);
+            cb(new Error('Folder already exists!'), false);
           }
         } else if (folderName && sameFolder == 'true') {
           cb(
@@ -104,7 +104,6 @@ const storage = multer.diskStorage({
               path.resolve('../google-drive-storage'),
               `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
             ),
-            a,
           );
         } else {
           cb(
