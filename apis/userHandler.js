@@ -152,21 +152,16 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
     const { id } = req.params,
       updUser = req.body,
       oldUser = await User.findById(id).select('password'),
-      isMatch = await bcrypt.compare(updUser.oldPassword, oldUser.password);
-    console.log(updUser.oldPassword, 'updUser.oldPassword');
-    console.log(oldUser.password, 'oldUser.password');
+      matchPassword = await oldUser.matchPassword(updUser.oldPassword);
 
-    if (!isMatch)
+    if (!matchPassword)
       return res.json({
         success: false,
         message: 'Old password is incorrect!',
       });
 
-    if (updUser.password != updUser.passwordCheck)
-      return res.json({ success: false, message: 'Passwords not matched!' });
-
     const salt = await bcrypt.genSalt(),
-      passwordHash = await bcrypt.hash(updUser.password, salt),
+      passwordHash = await bcrypt.hash(updUser.newPassword, salt),
       user = await User.findByIdAndUpdate(
         id,
         { password: passwordHash },
@@ -196,5 +191,185 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
     next(error);
   }
 });
+
+// Forgot password token
+exports.forgotPassword = async (req, res, next) => {
+  const response = new Response();
+  const user = await User.findOne({ email: req.query.email });
+
+  try {
+    if (!user) {
+      response.setError(`No user with the email: ${req.query.email} found!`);
+
+      const { ...responseObj } = response;
+
+      return res
+        .status(StatusCode.getStatusCode(responseObj))
+        .json(responseObj);
+    }
+
+    const resetToken = await user.getVerifyEmailToken();
+    const resetUrl = `${resetToken}`;
+    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+
+    // await sendEmail({
+    //   email: user.email,
+    //   subject: 'Verification Code',
+    //   message,
+    // });
+
+    response.setSuccess(`Email to ${user.email} has been sent!`);
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  } catch (error) {
+    console.log(error);
+
+    user.resetPasswordToken = undefined;
+    user.resetPasswordTokenExpiry = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    response.setServerError(error);
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  }
+};
+
+// Reset password
+exports.resetPassword = async (req, res, next) => {
+  const response = new Response();
+
+  try {
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.body.resetToken)
+      .digest('hex');
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordTokenExpiry: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      response.setError('Invalid Token!');
+
+      const { ...responseObj } = response;
+
+      return res
+        .status(StatusCode.getStatusCode(responseObj))
+        .json(responseObj);
+    }
+
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordTokenExpiry = undefined;
+
+    await user.save();
+
+    response.setSuccess('Password has been changed successfully!');
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  } catch (error) {
+    console.log(error);
+
+    response.setServerError(error);
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  }
+};
+
+// Verify email address
+exports.verifyEmail = async (req, res, next) => {
+  const response = new Response();
+
+  try {
+    const verifyEmailToken = crypto
+      .createHash('sha256')
+      .update(req.query.resetToken)
+      .digest('hex');
+    const user = await User.findOne({
+      verifyEmailToken,
+      verifyEmailTokenExpiry: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      response.setError('Invalid Token!');
+
+      const { ...responseObj } = response;
+
+      return res
+        .status(StatusCode.getStatusCode(responseObj))
+        .json(responseObj);
+    }
+
+    user.isAccountVerified = true;
+    user.verifyEmailToken = undefined;
+    user.verifyEmailTokenExpiry = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    response.setSuccess('Email Verified!');
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  } catch (error) {
+    console.log(error);
+
+    response.setServerError(error);
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  }
+};
+
+// Send verification email
+exports.sendEmail = async (req, res, next) => {
+  const response = new Response();
+
+  try {
+    const user = await User.findOne({ email: req.query.email });
+
+    if (!user) {
+      response.setError('User does not exist!');
+
+      const { ...responseObj } = response;
+
+      res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    }
+
+    const resetToken = await user.getVerifyEmailToken();
+    const resetUrl = `${resetToken}`;
+    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+
+    // await sendEmail({
+    //   email: user.email,
+    //   subject: 'Verification Code',
+    //   message,
+    // });
+
+    response.setSuccess('Verification email was sent successfully!');
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  } catch (error) {
+    console.log(error);
+
+    response.setServerError(error);
+
+    const { ...responseObj } = response;
+
+    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+  }
+};
 
 module.exports = router;
