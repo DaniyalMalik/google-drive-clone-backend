@@ -2,10 +2,11 @@ const express = require('express'),
   User = require('../models/User'),
   bcrypt = require('bcryptjs'),
   jwt = require('jsonwebtoken'),
+  sendEmail = require('../config/sendEmail'),
+  crypto = require('crypto'),
   { auth } = require('../middleware/auth'),
   router = express.Router();
 
-// register a new user
 router.post('/register', async (req, res, next) => {
   try {
     const { password, passwordCheck, firstName, email, lastName } = req.body;
@@ -15,7 +16,6 @@ router.post('/register', async (req, res, next) => {
         success: false,
         message: "Enter all fields' values!",
       });
-    ``;
 
     if (password != passwordCheck)
       return res.json({ success: false, message: 'Passwords do not match!' });
@@ -50,8 +50,6 @@ router.post('/register', async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -90,8 +88,6 @@ router.post('/login', async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -112,8 +108,6 @@ router.delete('/:id', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -142,8 +136,6 @@ router.put('/:id', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -187,42 +179,34 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
-// Forgot password token
-exports.forgotPassword = async (req, res, next) => {
-  const response = new Response();
+router.post('/forgotpassword', async (req, res, next) => {
   const user = await User.findOne({ email: req.query.email });
 
   try {
     if (!user) {
-      response.setError(`No user with the email: ${req.query.email} found!`);
-
-      const { ...responseObj } = response;
-
-      return res
-        .status(StatusCode.getStatusCode(responseObj))
-        .json(responseObj);
+      return res.json({
+        success: false,
+        message: `No user with the email: ${req.query.email} found!`,
+      });
     }
 
-    const resetToken = await user.getVerifyEmailToken();
-    const resetUrl = `${resetToken}`;
-    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+    const resetToken = await user.getResetPasswordToken();
+    const resetUrl = `http://localhost:3000/resetpassword/${resetToken}`;
+    const message = `Click on this url: \n${resetUrl}`;
 
-    // await sendEmail({
-    //   email: user.email,
-    //   subject: 'Verification Code',
-    //   message,
-    // });
+    await sendEmail({
+      email: user.email,
+      subject: 'Verification URL',
+      message,
+    });
 
-    response.setSuccess(`Email to ${user.email} has been sent!`);
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: true,
+      message: `Email to ${user.email} has been sent!`,
+    });
   } catch (error) {
     console.log(error);
 
@@ -231,18 +215,14 @@ exports.forgotPassword = async (req, res, next) => {
 
     await user.save({ validateBeforeSave: false });
 
-    response.setServerError(error);
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
   }
-};
+});
 
-// Reset password
-exports.resetPassword = async (req, res, next) => {
-  const response = new Response();
-
+router.post('/resetpassword', async (req, res, next) => {
   try {
     const resetPasswordToken = crypto
       .createHash('sha256')
@@ -254,45 +234,40 @@ exports.resetPassword = async (req, res, next) => {
     });
 
     if (!user) {
-      response.setError('Invalid Token!');
-
-      const { ...responseObj } = response;
-
-      return res
-        .status(StatusCode.getStatusCode(responseObj))
-        .json(responseObj);
+      return res.json({
+        success: false,
+        message: 'Invalid Token!',
+      });
     }
 
-    user.password = req.body.password;
+    const salt = await bcrypt.genSalt();
+    const passwordHash = await bcrypt.hash(req.body.password, salt);
+
+    user.password = passwordHash;
     user.resetPasswordToken = undefined;
     user.resetPasswordTokenExpiry = undefined;
 
     await user.save();
 
-    response.setSuccess('Password has been changed successfully!');
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: true,
+      message: 'Password has been changed successfully!',
+    });
   } catch (error) {
     console.log(error);
 
-    response.setServerError(error);
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
   }
-};
+});
 
-// Verify email address
-exports.verifyEmail = async (req, res, next) => {
-  const response = new Response();
-
+router.post('/verifyemail', auth, async (req, res, next) => {
   try {
     const verifyEmailToken = crypto
       .createHash('sha256')
-      .update(req.query.resetToken)
+      .update(req.body.resetToken)
       .digest('hex');
     const user = await User.findOne({
       verifyEmailToken,
@@ -300,76 +275,65 @@ exports.verifyEmail = async (req, res, next) => {
     });
 
     if (!user) {
-      response.setError('Invalid Token!');
-
-      const { ...responseObj } = response;
-
-      return res
-        .status(StatusCode.getStatusCode(responseObj))
-        .json(responseObj);
+      return res.json({
+        success: false,
+        message: 'Invalid Token!',
+      });
     }
 
-    user.isAccountVerified = true;
+    user.isEmailVerified = true;
     user.verifyEmailToken = undefined;
     user.verifyEmailTokenExpiry = undefined;
 
     await user.save({ validateBeforeSave: false });
 
-    response.setSuccess('Email Verified!');
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      user,
+      success: true,
+      message: 'Email Verified!',
+    });
   } catch (error) {
     console.log(error);
 
-    response.setServerError(error);
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    return res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
   }
-};
+});
 
-// Send verification email
-exports.sendEmail = async (req, res, next) => {
-  const response = new Response();
-
+router.get('/sendverifyemail', auth, async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.query.email });
 
-    if (!user) {
-      response.setError('User does not exist!');
-
-      const { ...responseObj } = response;
-
-      res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
-    }
+    if (!user)
+      return res.json({
+        success: false,
+        message: 'User does not exist!',
+      });
 
     const resetToken = await user.getVerifyEmailToken();
     const resetUrl = `${resetToken}`;
     const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
 
-    // await sendEmail({
-    //   email: user.email,
-    //   subject: 'Verification Code',
-    //   message,
-    // });
+    await sendEmail({
+      email: user.email,
+      subject: 'Verification Code',
+      message,
+    });
 
-    response.setSuccess('Verification email was sent successfully!');
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: true,
+      message: 'Verification email was sent successfully!',
+    });
   } catch (error) {
     console.log(error);
 
-    response.setServerError(error);
-
-    const { ...responseObj } = response;
-
-    res.status(StatusCode.getStatusCode(responseObj)).json(responseObj);
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
   }
-};
+});
 
 module.exports = router;

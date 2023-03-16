@@ -142,7 +142,7 @@ router.post('/', auth, (req, res, next) => {
           success: false,
           message: error.message,
         });
-      console.log(req.files, 'req.files');
+
       res.json({
         success: true,
         message: 'Uploaded Successfully!',
@@ -155,8 +155,6 @@ router.post('/', auth, (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -186,8 +184,6 @@ router.post('/create', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -257,8 +253,6 @@ router.get('/', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 
@@ -281,8 +275,6 @@ router.delete('/', auth, async (req, res, next) => {
       success: false,
       message: 'An error occurred!',
     });
-
-    next(error);
   }
 });
 

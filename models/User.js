@@ -1,6 +1,7 @@
 const mongoose = require('mongoose'),
   bcrypt = require('bcryptjs'),
   { Schema } = mongoose,
+  crypto = require('crypto'),
   UserSchema = new Schema(
     {
       email: {
@@ -35,6 +36,10 @@ const mongoose = require('mongoose'),
         minlength: 6,
         select: false,
       },
+      verifyEmailToken: String,
+      resetPasswordToken: String,
+      verifyEmailTokenExpiry: Date,
+      resetPasswordTokenExpiry: Date,
     },
     {
       timestamps: true,
@@ -44,6 +49,32 @@ const mongoose = require('mongoose'),
 // Comparing passwords
 UserSchema.methods.matchPassword = function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
+};
+
+UserSchema.methods.getResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(20).toString('hex');
+
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  this.resetPasswordTokenExpiry = Date.now() + 10 * 60 * 1000;
+  this.save({ validateBeforeSave: false });
+
+  return resetToken;
+};
+
+UserSchema.methods.getVerifyEmailToken = function () {
+  const resetToken = crypto.randomBytes(6).toString('hex');
+
+  this.verifyEmailToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  this.verifyEmailTokenExpiry = Date.now() + 10 * 60 * 1000;
+  this.save({ validateBeforeSave: false });
+
+  return resetToken;
 };
 
 module.exports = mongoose.model('user', UserSchema);
