@@ -39,6 +39,16 @@ router.post('/register', async (req, res, next) => {
 
     await newUser.save();
 
+    const resetToken = await newUser.getVerifyEmailToken();
+    const resetUrl = `${resetToken}`;
+    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+
+    await sendEmail({
+      email: newUser.email,
+      subject: 'Verification Code',
+      message,
+    });
+
     res.json({
       message: 'User Registered!',
       success: true,

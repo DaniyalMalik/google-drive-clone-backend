@@ -2,15 +2,32 @@ const express = require('express'),
   router = express.Router(),
   multer = require('multer'),
   path = require('path'),
+  getFolderSize = require('get-folder-size'),
   { auth } = require('../middleware/auth'),
   fs = require('fs'),
   User = require('../models/User'),
   util = require('util'),
   mime = require('mime');
 
+function removeDot(folderName) {
+  let temp = folderName.split(''),
+    newName = '';
+
+  for (let i = 0; i < temp.length; i++) {
+    if (temp[i] === '.') {
+      continue;
+    }
+
+    newName += temp[i];
+  }
+
+  return newName;
+}
+
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
       const { folderName, sameFolder } = req.query;
+      // const folderSize = util.promisify(getFolderSize);
       const mkdir = util.promisify(fs.mkdir);
       let user;
 
@@ -26,111 +43,126 @@ const storage = multer.diskStorage({
       } else {
         user = await User.findById(req.user);
       }
-      console.log(
-        folderName,
-        sameFolder,
-        user,
-        'folderName, sameFolder, user!!!!!!!',
-      );
-      if (user) {
-        if (
-          !fs.existsSync(
+
+      // if (user) {
+      if (
+        !fs.existsSync(
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}`,
+          ),
+        )
+      ) {
+        const promises = [];
+
+        promises.push(
+          mkdir(
             path.join(
               path.resolve('../google-drive-storage'),
               `/${user.firstName}-${user.lastName}-${user._id}`,
             ),
-          )
-        ) {
-          const promises = [];
-
-          promises.push(
-            mkdir(
-              path.join(
+          ),
+        );
+        promises.push(
+          User.findByIdAndUpdate(
+            req.user,
+            {
+              folderPath: path.join(
                 path.resolve('../google-drive-storage'),
                 `/${user.firstName}-${user.lastName}-${user._id}`,
               ),
-            ),
-          );
-          promises.push(
-            User.findByIdAndUpdate(
-              req.user,
-              {
-                folderPath: path.join(
-                  path.resolve('../google-drive-storage'),
-                  `/${user.firstName}-${user.lastName}-${user._id}`,
-                ),
-              },
-              {
-                new: true,
-                runValidators: true,
-                useFindAndModify: false,
-              },
-            ),
-          );
+            },
+            {
+              new: true,
+              runValidators: true,
+              useFindAndModify: false,
+            },
+          ),
+        );
 
-          await Promise.all(promises);
-        }
-
-        if (folderName && (!sameFolder || sameFolder == 'false')) {
-          if (
-            !fs.existsSync(
-              path.join(
-                path.resolve('../google-drive-storage'),
-                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-              ),
-            )
-          ) {
-            mkdir(
-              path.join(
-                path.resolve('../google-drive-storage'),
-                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-              ),
-            );
-
-            cb(
-              null,
-              path.join(
-                path.resolve('../google-drive-storage'),
-                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-              ),
-            );
-          } else {
-            cb(new Error('Folder already exists!'), false);
-          }
-        } else if (folderName && sameFolder == 'true') {
-          cb(
-            null,
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
-            ),
-          );
-        } else {
-          cb(
-            null,
-            path.join(
-              path.resolve('../google-drive-storage'),
-              `/${user.firstName}-${user.lastName}-${user._id}`,
-            ),
-          );
-        }
-      } else {
-        return cb(new Error('User does not exist!'), false);
+        await Promise.all(promises);
       }
+
+      // const size = await folderSize(
+      //   path.join(
+      //     path.resolve('../google-drive-storage'),
+      //     `/${user.firstName}-${user.lastName}-${user._id}`,
+      //   ),
+      // );
+
+      // if (size / 1024 / 1024 / 1024 < user.storageLimit) {
+      if (folderName && (!sameFolder || sameFolder == 'false')) {
+        // if (
+        //   !fs.existsSync(
+        //     path.join(
+        //       path.resolve('../google-drive-storage'),
+        //       `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+        //     ),
+        //   )
+        // ) {
+        let changedFolderName = folderName;
+
+        if (folderName.includes('.')) {
+          changedFolderName = removeDot(folderName);
+        }
+
+        mkdir(
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
+          ),
+        );
+
+        cb(
+          null,
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
+          ),
+        );
+        // } else {
+        //   cb(new Error('Folder already exists!'), false);
+        // }
+      } else if (folderName && sameFolder == 'true') {
+        cb(
+          null,
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+          ),
+        );
+      } else {
+        cb(
+          null,
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}`,
+          ),
+        );
+      }
+      // } else {
+      //   cb('Your have reached your maximum storage limit!', false);
+      // }
+      // } else {
+      //   cb('User does not exist!', false);
+      // }
     },
     filename: function (req, file, cb) {
       cb(
         null,
-        path.basename(file.originalname, path.extname(file.originalname)) +
-          path.extname(file.originalname),
+        removeDot(
+          path.basename(file.originalname, path.extname(file.originalname)),
+        ) + path.extname(file.originalname),
       );
     },
   }),
   upload = multer({ storage }).array('files');
 
-router.post('/', auth, (req, res, next) => {
+router.post('/', auth, async (req, res, next) => {
   try {
-    upload(req, res, (error) => {
+    const folderSize = util.promisify(getFolderSize);
+
+    upload(req, res, async function (error) {
       if (!req.files)
         return res.json({
           success: false,
@@ -143,9 +175,24 @@ router.post('/', auth, (req, res, next) => {
           message: error.message,
         });
 
+      let user = await User.findById(req.user);
+      const size = await folderSize(
+        path.join(
+          path.resolve('../google-drive-storage'),
+          `/${user.firstName}-${user.lastName}-${user._id}`,
+        ),
+      );
+
+      user = await User.findByIdAndUpdate(
+        req.user,
+        { currentStorage: size / 1024 / 1024 / 1024 },
+        { useFindAndModify: false },
+      );
+
       res.json({
         success: true,
         message: 'Uploaded Successfully!',
+        user,
       });
     });
   } catch (error) {
@@ -258,22 +305,45 @@ router.get('/', auth, async (req, res, next) => {
 
 router.delete('/', auth, async (req, res, next) => {
   try {
-    const { fileOrFolderName } = req.query;
+    const { fileOrFolderName, folder = false } = req.query;
     const user = await User.findById(req.user);
-    const unlink = util.promisify(fs.unlink);
 
-    await unlink(path.join(user.folderPath, fileOrFolderName));
+    if (folder == 'false') {
+      const unlink = util.promisify(fs.unlink);
 
-    res.json({
-      success: true,
-      message: 'File deleted successfully!',
-    });
+      await unlink(path.join(user.folderPath, fileOrFolderName));
+
+      res.json({
+        success: true,
+        message: 'File deleted successfully!',
+      });
+    } else {
+      try {
+        const unlink = util.promisify(fs.rmdir);
+
+        await unlink(path.join(user.folderPath, fileOrFolderName), {
+          recursive: true,
+        });
+
+        res.json({
+          success: true,
+          message: 'Folder deleted successfully!',
+        });
+      } catch (error) {
+        console.log(error);
+
+        res.json({
+          success: false,
+          message: 'Empty the folder first!',
+        });
+      }
+    }
   } catch (error) {
     console.log(error);
 
     res.json({
       success: false,
-      message: 'An error occurred!',
+      message: error.message,
     });
   }
 });

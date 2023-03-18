@@ -27,14 +27,20 @@ const mongoose = require('mongoose'),
         type: String,
         required: [true, 'Last name is required!'],
       },
-      folderPath: {
-        type: String,
-      },
+      folderPath: String,
       password: {
         type: String,
         required: [true, 'Password is required!'],
         minlength: 6,
         select: false,
+      },
+      storageLimit: {
+        type: Number,
+        default: 5,
+      },
+      currentStorage: {
+        type: Number,
+        default: 0,
       },
       verifyEmailToken: String,
       resetPasswordToken: String,
