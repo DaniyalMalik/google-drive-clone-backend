@@ -42,6 +42,16 @@ const mongoose = require('mongoose'),
         type: Number,
         default: 0,
       },
+      sharedWithMe: {
+        type: [Schema.Types.ObjectId],
+        ref: 'user',
+        required: [true, "User's id is required!"],
+      },
+      sharedWith: {
+        type: [Schema.Types.ObjectId],
+        ref: 'user',
+        required: [true, "User's id is required!"],
+      },
       verifyEmailToken: String,
       resetPasswordToken: String,
       verifyEmailTokenExpiry: Date,
@@ -71,7 +81,7 @@ UserSchema.methods.getResetPasswordToken = function () {
 };
 
 UserSchema.methods.getVerifyEmailToken = function () {
-  const resetToken = crypto.randomBytes(6).toString('hex');
+  const resetToken = crypto.randomBytes(10).toString('hex');
 
   this.verifyEmailToken = crypto
     .createHash('sha256')

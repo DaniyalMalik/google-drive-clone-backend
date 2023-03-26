@@ -187,7 +187,7 @@ router.post('/', auth, async (req, res, next) => {
         req.user,
         { currentStorage: size / 1024 / 1024 / 1024 },
         { useFindAndModify: false },
-      );
+      ).populate('shared');
 
       res.json({
         success: true,
@@ -234,13 +234,88 @@ router.post('/create', auth, async (req, res, next) => {
   }
 });
 
+router.put('/share', auth, async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    const user = await User.findOne({ email, _id: { $ne: req.user } });
+
+    if (!user)
+      return res.json({
+        success: false,
+        message: 'User not found!',
+      });
+
+    await User.updateOne(
+      { _id: user._id },
+      { $push: { sharedWithMe: req.user } },
+    );
+    await User.updateOne(
+      { _id: req.user },
+      { $push: { sharedWith: user._id } },
+    );
+
+    res.json({
+      success: true,
+      message: 'Shared successfully!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.put('/unshare', auth, async (req, res, next) => {
+  try {
+    const { userId } = req.query;
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        $pull: {
+          sharedWithMe: req.user,
+        },
+      },
+    );
+    await User.updateOne(
+      { _id: req.user },
+      {
+        $pull: {
+          sharedWith: userId,
+        },
+      },
+    );
+
+    res.json({
+      success: true,
+      message: 'Unshared successfully!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
 router.get('/', auth, async (req, res, next) => {
   try {
-    const { folderName } = req.query,
+    const { folderName, userPath } = req.query,
       user = await User.findById(req.user),
       readdir = util.promisify(fs.readdir),
       rawFiles = await readdir(
-        folderName ? path.join(user.folderPath, folderName) : user.folderPath,
+        folderName && userPath
+          ? path.join(userPath, folderName)
+          : folderName
+          ? path.join(user.folderPath, folderName)
+          : userPath
+          ? userPath
+          : user.folderPath,
       ),
       files = [],
       folders = [];
@@ -251,8 +326,12 @@ router.get('/', auth, async (req, res, next) => {
 
       if (rawFiles[i].split('.').length === 2) {
         file = await readFile(
-          folderName
+          folderName && userPath
+            ? path.join(userPath, folderName, rawFiles[i])
+            : folderName
             ? path.join(user.folderPath, folderName, rawFiles[i])
+            : userPath
+            ? path.join(userPath, rawFiles[i])
             : path.join(user.folderPath, rawFiles[i]),
         );
 
@@ -260,24 +339,40 @@ router.get('/', auth, async (req, res, next) => {
           file: file.toString('base64'),
           mimeType: mime.getType(
             path.basename(
-              folderName
+              folderName && userPath
+                ? path.join(userPath, folderName, rawFiles[i])
+                : folderName
                 ? path.join(user.folderPath, folderName, rawFiles[i])
+                : userPath
+                ? path.join(userPath, rawFiles[i])
                 : path.join(user.folderPath, rawFiles[i]),
             ),
           ),
           fileName: path.basename(
-            folderName
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
               ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
             path.extname(
-              folderName
+              folderName && userPath
+                ? path.join(userPath, folderName, rawFiles[i])
+                : folderName
                 ? path.join(user.folderPath, folderName, rawFiles[i])
+                : userPath
+                ? path.join(userPath, rawFiles[i])
                 : path.join(user.folderPath, rawFiles[i]),
             ),
           ),
           fileNameWithExt: path.basename(
-            folderName
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
               ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
           ),
         });

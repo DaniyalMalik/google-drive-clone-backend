@@ -40,8 +40,8 @@ router.post('/register', async (req, res, next) => {
     await newUser.save();
 
     const resetToken = await newUser.getVerifyEmailToken();
-    const resetUrl = `${resetToken}`;
-    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+    const resetUrl = `http://localhost:3000/login/${resetToken}`;
+    const message = `Click on the following url to verify your email address: \n${resetUrl}`;
 
     await sendEmail({
       email: newUser.email,
@@ -73,10 +73,19 @@ router.post('/login', async (req, res, next) => {
         message: 'Enter all fields!',
       });
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email })
+      .select('+password')
+      .populate('sharedWithMe sharedWith');
 
     if (!user)
       return res.json({ success: false, message: 'User does not exist!' });
+
+    if (!user.isEmailVerified)
+      return res.json({
+        success: false,
+        isEmailVerified: false,
+        message: 'Verify your email address first!',
+      });
 
     const isMatch = await bcrypt.compare(password, user.password);
 
@@ -129,7 +138,7 @@ router.put('/:id', auth, async (req, res, next) => {
         new: true,
         runValidators: true,
         useFindAndModify: false,
-      });
+      }).populate('sharedWithMe sharedWith');
 
     if (!user) {
       return res.json({
@@ -172,7 +181,7 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
           runValidators: true,
           useFindAndModify: false,
         },
-      );
+      ).populate('sharedWithMe sharedWith');
 
     if (!user) {
       return res.json({
@@ -182,6 +191,30 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
     }
 
     res.json({ success: true, message: 'Password Updated!', user });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.get('/', auth, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user).populate(
+      'sharedWithMe sharedWith',
+    );
+
+    if (!user) {
+      return res.json({
+        success: false,
+        message: 'User not found!',
+      });
+    }
+
+    res.json({ success: true, user });
   } catch (error) {
     console.log(error);
 
@@ -273,7 +306,7 @@ router.post('/resetpassword', async (req, res, next) => {
   }
 });
 
-router.post('/verifyemail', auth, async (req, res, next) => {
+router.post('/verifyemail', async (req, res, next) => {
   try {
     const verifyEmailToken = crypto
       .createHash('sha256')
@@ -282,7 +315,7 @@ router.post('/verifyemail', auth, async (req, res, next) => {
     const user = await User.findOne({
       verifyEmailToken,
       verifyEmailTokenExpiry: { $gt: Date.now() },
-    });
+    }).populate('sharedWithMe sharedWith');
 
     if (!user) {
       return res.json({
@@ -312,7 +345,7 @@ router.post('/verifyemail', auth, async (req, res, next) => {
   }
 });
 
-router.get('/sendverifyemail', auth, async (req, res, next) => {
+router.get('/sendverifyemail', async (req, res, next) => {
   try {
     const user = await User.findOne({ email: req.query.email });
 
@@ -323,8 +356,8 @@ router.get('/sendverifyemail', auth, async (req, res, next) => {
       });
 
     const resetToken = await user.getVerifyEmailToken();
-    const resetUrl = `${resetToken}`;
-    const message = `Enter the Following reset code in your mobile app: \n${resetUrl}`;
+    const resetUrl = `http://localhost:3000/login/${resetToken}`;
+    const message = `Click on the following url to verify your email address: \n${resetUrl}`;
 
     await sendEmail({
       email: user.email,
