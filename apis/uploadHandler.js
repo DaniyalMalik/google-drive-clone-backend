@@ -306,6 +306,7 @@ router.put('/unshare', auth, async (req, res, next) => {
 router.get('/', auth, async (req, res, next) => {
   try {
     const { folderName, userPath } = req.query,
+      folderSize = util.promisify(getFolderSize),
       user = await User.findById(req.user),
       readdir = util.promisify(fs.readdir),
       rawFiles = await readdir(
@@ -325,7 +326,7 @@ router.get('/', auth, async (req, res, next) => {
       const readFile = util.promisify(fs.readFile);
 
       if (rawFiles[i].split('.').length === 2) {
-        file = await readFile(
+        const { ...stats } = await fs.promises.stat(
           folderName && userPath
             ? path.join(userPath, folderName, rawFiles[i])
             : folderName
@@ -335,6 +336,15 @@ router.get('/', auth, async (req, res, next) => {
             : path.join(user.folderPath, rawFiles[i]),
         );
 
+        file = await readFile(
+          folderName && userPath
+            ? path.join(userPath, folderName, rawFiles[i])
+            : folderName
+            ? path.join(user.folderPath, folderName, rawFiles[i])
+            : userPath
+            ? path.join(userPath, rawFiles[i])
+            : path.join(user.folderPath, rawFiles[i]),
+        );
         files.push({
           file: file.toString('base64'),
           mimeType: mime.getType(
@@ -375,10 +385,36 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(userPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
           ),
+          size: stats.size,
+          location:
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
         });
       } else {
         folders.push({
+          size: await folderSize(
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
+          ),
           folderName: rawFiles[i],
+          location:
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
         });
       }
     }
