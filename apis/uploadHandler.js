@@ -234,6 +234,36 @@ router.post('/create', auth, async (req, res, next) => {
   }
 });
 
+router.put('/rename', auth, async (req, res, next) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    const rename = util.promisify(fs.rename);
+    console.log(oldPath, 'oldPath');
+    console.log(newPath, 'newPath');
+
+    if (fs.existsSync(newPath)) {
+      return res.json({
+        success: false,
+        message: 'Name already exists!',
+      });
+    } else {
+      await rename(oldPath, newPath);
+    }
+
+    res.json({
+      success: true,
+      message: 'Renamed successfully!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
 router.put('/share', auth, async (req, res, next) => {
   try {
     const { email } = req.query;
@@ -436,13 +466,25 @@ router.get('/', auth, async (req, res, next) => {
 
 router.delete('/', auth, async (req, res, next) => {
   try {
-    const { fileOrFolderName, folder = false } = req.query;
-    const user = await User.findById(req.user);
+    const { fileOrFolderName, folder = false } = req.query,
+      user = await User.findById(req.user);
 
     if (folder == 'false') {
+      const folderSize = util.promisify(getFolderSize);
       const unlink = util.promisify(fs.unlink);
+      const size = await folderSize(
+        path.join(
+          path.resolve('../google-drive-storage'),
+          `/${user.firstName}-${user.lastName}-${user._id}`,
+        ),
+      );
 
       await unlink(path.join(user.folderPath, fileOrFolderName));
+      await User.findByIdAndUpdate(
+        req.user,
+        { currentStorage: size / 1024 / 1024 / 1024 },
+        { useFindAndModify: false },
+      );
 
       res.json({
         success: true,
@@ -451,10 +493,22 @@ router.delete('/', auth, async (req, res, next) => {
     } else {
       try {
         const unlink = util.promisify(fs.rmdir);
+        const folderSize = util.promisify(getFolderSize);
+        const size = await folderSize(
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}`,
+          ),
+        );
 
         await unlink(path.join(user.folderPath, fileOrFolderName), {
           recursive: true,
         });
+        await User.findByIdAndUpdate(
+          req.user,
+          { currentStorage: size / 1024 / 1024 / 1024 },
+          { useFindAndModify: false },
+        );
 
         res.json({
           success: true,
