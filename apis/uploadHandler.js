@@ -102,16 +102,22 @@ const storage = multer.diskStorage({
         // ) {
         let changedFolderName = folderName;
 
-        if (folderName.includes('.')) {
-          changedFolderName = removeDot(folderName);
-        }
+        if (folderName.includes('.')) changedFolderName = removeDot(folderName);
 
-        mkdir(
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
-          ),
-        );
+        if (
+          !fs.existsSync(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
+            ),
+          )
+        )
+          mkdir(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
+            ),
+          );
 
         cb(
           null,
@@ -211,8 +217,8 @@ router.post('/create', auth, async (req, res, next) => {
       mkdir = util.promisify(fs.mkdir),
       user = await User.findById(req.user);
 
-    if (!fs.existsSync(path.resolve(path.join(user.folderPath, folderName)))) {
-      await mkdir(path.resolve(path.join(user.folderPath, folderName)));
+    if (!fs.existsSync(path.join(user.folderPath, folderName))) {
+      await mkdir(path.join(user.folderPath, folderName));
 
       res.json({
         success: true,
@@ -238,8 +244,6 @@ router.put('/rename', auth, async (req, res, next) => {
   try {
     const { oldPath, newPath } = req.body;
     const rename = util.promisify(fs.rename);
-    console.log(oldPath, 'oldPath');
-    console.log(newPath, 'newPath');
 
     if (fs.existsSync(newPath)) {
       return res.json({
@@ -335,7 +339,7 @@ router.put('/unshare', auth, async (req, res, next) => {
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const { folderName, userPath } = req.query,
+    const { folderName, userPath, customPath } = req.query,
       folderSize = util.promisify(getFolderSize),
       user = await User.findById(req.user),
       readdir = util.promisify(fs.readdir),
@@ -346,6 +350,8 @@ router.get('/', auth, async (req, res, next) => {
           ? path.join(user.folderPath, folderName)
           : userPath
           ? userPath
+          : customPath
+          ? customPath
           : user.folderPath,
       ),
       files = [],
@@ -363,6 +369,8 @@ router.get('/', auth, async (req, res, next) => {
             ? path.join(user.folderPath, folderName, rawFiles[i])
             : userPath
             ? path.join(userPath, rawFiles[i])
+            : customPath
+            ? path.join(customPath, rawFiles[i])
             : path.join(user.folderPath, rawFiles[i]),
         );
 
@@ -373,6 +381,8 @@ router.get('/', auth, async (req, res, next) => {
             ? path.join(user.folderPath, folderName, rawFiles[i])
             : userPath
             ? path.join(userPath, rawFiles[i])
+            : customPath
+            ? path.join(customPath, rawFiles[i])
             : path.join(user.folderPath, rawFiles[i]),
         );
         files.push({
@@ -385,6 +395,8 @@ router.get('/', auth, async (req, res, next) => {
                 ? path.join(user.folderPath, folderName, rawFiles[i])
                 : userPath
                 ? path.join(userPath, rawFiles[i])
+                : customPath
+                ? path.join(customPath, rawFiles[i])
                 : path.join(user.folderPath, rawFiles[i]),
             ),
           ),
@@ -395,6 +407,8 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(user.folderPath, folderName, rawFiles[i])
               : userPath
               ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
             path.extname(
               folderName && userPath
@@ -403,6 +417,8 @@ router.get('/', auth, async (req, res, next) => {
                 ? path.join(user.folderPath, folderName, rawFiles[i])
                 : userPath
                 ? path.join(userPath, rawFiles[i])
+                : customPath
+                ? path.join(customPath, rawFiles[i])
                 : path.join(user.folderPath, rawFiles[i]),
             ),
           ),
@@ -413,6 +429,8 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(user.folderPath, folderName, rawFiles[i])
               : userPath
               ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
           ),
           size: stats.size,
@@ -423,6 +441,8 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(user.folderPath, folderName, rawFiles[i])
               : userPath
               ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
         });
       } else {
@@ -434,6 +454,8 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(user.folderPath, folderName, rawFiles[i])
               : userPath
               ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
           ),
           folderName: rawFiles[i],
@@ -444,6 +466,8 @@ router.get('/', auth, async (req, res, next) => {
               ? path.join(user.folderPath, folderName, rawFiles[i])
               : userPath
               ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
         });
       }
@@ -464,27 +488,17 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
-router.delete('/', auth, async (req, res, next) => {
+router.post('/delete', auth, async (req, res, next) => {
   try {
-    const { fileOrFolderName, folder = false } = req.query,
-      user = await User.findById(req.user);
+    const { folder = false, customPath = undefined } = req.body;
 
+    console.log(customPath, 'customPath');
+    console.log(folder, 'folder');
     if (folder == 'false') {
-      const folderSize = util.promisify(getFolderSize);
+      console.log('here-1');
       const unlink = util.promisify(fs.unlink);
-      const size = await folderSize(
-        path.join(
-          path.resolve('../google-drive-storage'),
-          `/${user.firstName}-${user.lastName}-${user._id}`,
-        ),
-      );
 
-      await unlink(path.join(user.folderPath, fileOrFolderName));
-      await User.findByIdAndUpdate(
-        req.user,
-        { currentStorage: size / 1024 / 1024 / 1024 },
-        { useFindAndModify: false },
-      );
+      await unlink(customPath);
 
       res.json({
         success: true,
@@ -492,23 +506,12 @@ router.delete('/', auth, async (req, res, next) => {
       });
     } else {
       try {
-        const unlink = util.promisify(fs.rmdir);
-        const folderSize = util.promisify(getFolderSize);
-        const size = await folderSize(
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}`,
-          ),
-        );
+        console.log('here-2');
+        const unlink = util.promisify(fs.rm);
 
-        await unlink(path.join(user.folderPath, fileOrFolderName), {
+        await unlink(customPath, {
           recursive: true,
         });
-        await User.findByIdAndUpdate(
-          req.user,
-          { currentStorage: size / 1024 / 1024 / 1024 },
-          { useFindAndModify: false },
-        );
 
         res.json({
           success: true,
@@ -528,7 +531,94 @@ router.delete('/', auth, async (req, res, next) => {
 
     res.json({
       success: false,
-      message: error.message,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.post('/trash', auth, async (req, res, next) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    const rename = util.promisify(fs.rename);
+    const folderSize = util.promisify(getFolderSize);
+    const user = await User.findById(req.user);
+    let userFolderTemp = user.folderPath.split('\\');
+    let trashTemp = user.folderPath.split('\\');
+    const mkdir = util.promisify(fs.mkdir);
+
+    trashTemp.pop();
+    trashTemp.splice(trashTemp.length, 0, 'trash');
+    userFolderTemp.splice(userFolderTemp.length - 1, 0, 'trash');
+
+    const userFolderDir = userFolderTemp.join('\\');
+    const trashDir = trashTemp.join('\\');
+
+    if (!fs.existsSync(trashDir)) {
+      await mkdir(trashDir);
+      await mkdir(userFolderDir);
+    } else if (!fs.existsSync(userFolderDir)) {
+      await mkdir(userFolderDir);
+    }
+
+    await rename(oldPath, newPath);
+
+    const size = await folderSize(
+      path.join(
+        path.resolve('../google-drive-storage'),
+        `/${user.firstName}-${user.lastName}-${user._id}`,
+      ),
+    );
+    await User.findByIdAndUpdate(
+      req.user,
+      { currentStorage: size / 1024 / 1024 / 1024 },
+      { useFindAndModify: false },
+    );
+
+    res.json({
+      success: true,
+      message: 'Moved to trash!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.post('/recover', auth, async (req, res, next) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    const rename = util.promisify(fs.rename);
+    const folderSize = util.promisify(getFolderSize);
+    const user = await User.findById(req.user);
+
+    await rename(oldPath, newPath);
+
+    const size = await folderSize(
+      path.join(
+        path.resolve('../google-drive-storage'),
+        `/${user.firstName}-${user.lastName}-${user._id}`,
+      ),
+    );
+    await User.findByIdAndUpdate(
+      req.user,
+      { currentStorage: size / 1024 / 1024 / 1024 },
+      { useFindAndModify: false },
+    );
+
+    res.json({
+      success: true,
+      message: 'Recovered successfully!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
     });
   }
 });
