@@ -73,9 +73,7 @@ router.post('/login', async (req, res, next) => {
         message: 'Enter all fields!',
       });
 
-    const user = await User.findOne({ email })
-      .select('+password')
-      .populate('sharedWithMe sharedWith');
+    const user = await User.findOne({ email }).select('+password');
 
     if (!user)
       return res.json({ success: false, message: 'User does not exist!' });
@@ -138,7 +136,7 @@ router.put('/:id', auth, async (req, res, next) => {
         new: true,
         runValidators: true,
         useFindAndModify: false,
-      }).populate('sharedWithMe sharedWith');
+      });
 
     if (!user) {
       return res.json({
@@ -181,7 +179,7 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
           runValidators: true,
           useFindAndModify: false,
         },
-      ).populate('sharedWithMe sharedWith');
+      );
 
     if (!user) {
       return res.json({
@@ -203,9 +201,7 @@ router.put('/updatepassword/:id', auth, async (req, res, next) => {
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user).populate(
-      'sharedWithMe sharedWith',
-    );
+    const user = await User.findById(req.user);
 
     if (!user) {
       return res.json({
@@ -215,6 +211,28 @@ router.get('/', auth, async (req, res, next) => {
     }
 
     res.json({ success: true, user });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.get('/all', auth, async (req, res, next) => {
+  try {
+    const users = await User.find({ _id: { $ne: req.user } });
+
+    if (!users) {
+      return res.json({
+        success: false,
+        message: 'User not found!',
+      });
+    }
+
+    res.json({ success: true, users });
   } catch (error) {
     console.log(error);
 
@@ -315,7 +333,7 @@ router.post('/verifyemail', async (req, res, next) => {
     const user = await User.findOne({
       verifyEmailToken,
       verifyEmailTokenExpiry: { $gt: Date.now() },
-    }).populate('sharedWithMe sharedWith');
+    });
 
     if (!user) {
       return res.json({
