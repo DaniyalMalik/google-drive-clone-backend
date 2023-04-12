@@ -273,42 +273,41 @@ router.put('/rename', auth, async (req, res, next) => {
 router.put('/share', auth, async (req, res, next) => {
   try {
     const payload = req.body;
-    console.log(payload, 'payload');
-    const user = await User.findById(payload.userId).select('folderPath');
-
-    if (!user)
-      return res.json({
-        success: false,
-        message: 'User not found!',
-      });
-
+    const user = await User.findById(req.user);
     let shared = await Shared.findOne({
       sharedWith: payload.userId,
-      sharedBy: req.user,
+      sharedBy: user._id,
     });
-    console.log(user, 'user');
-    console.log(shared, 'shared');
+
     if (shared && payload.wholeFolder) {
-      console.log('here-1');
       shared.sharedPath = [user.folderPath];
+
       await shared.save();
     } else if (shared) {
-      console.log('here-2');
-      if (!shared.sharedPath.includes(payload.path)) {
+      if (
+        !shared.sharedPath.includes(payload.path) &&
+        !shared.sharedPath.includes(user.folderPath)
+      ) {
         shared.sharedPath = shared.sharedPath.concat(payload.path);
 
         await shared.save();
       }
-    } else {
-      console.log('here-3');
+    } else if (!shared && payload.wholeFolder) {
       shared = await Shared.create({
         ...payload,
         sharedPath: [user.folderPath],
         sharedBy: req.user,
         sharedWith: payload.userId,
       });
+    } else {
+      shared = await Shared.create({
+        ...payload,
+        sharedPath: [payload.path],
+        sharedBy: req.user,
+        sharedWith: payload.userId,
+      });
     }
-    console.log(shared, 'shared');
+
     res.json({
       success: true,
       message: 'Shared successfully!',
@@ -325,14 +324,15 @@ router.put('/share', auth, async (req, res, next) => {
 
 router.put('/unshare', auth, async (req, res, next) => {
   try {
-    const { wholeFolder = undefined, userId, path } = req.query;
-    let shared = await Shared.findOne({ sharedWith: userId });
-    console.log(wholeFolder, userId, 'wholeFolder = undefined, userId');
+    const { wholeFolder = undefined, userId, path } = req.body;
+
     if (wholeFolder) {
-      shared.sharedPath = [];
-      await shared.save();
+      await Shared.deleteOne({
+        sharedWith: userId,
+        sharedBy: req.user,
+      });
     } else {
-      shared = await Shared.updateOne(
+      await Shared.updateOne(
         { sharedBy: req.user, sharedWith: userId },
         {
           $pull: {
@@ -358,9 +358,9 @@ router.put('/unshare', auth, async (req, res, next) => {
 
 router.get('/', auth, async (req, res, next) => {
   try {
-    const { folderName, userPath, customPath } = req.query,
+    const { folderName, userPath, customPath, userId = undefined } = req.query,
       folderSize = util.promisify(getFolderSize),
-      user = await User.findById(req.user),
+      user = await User.findById(userId ? userId : req.user),
       readdir = util.promisify(fs.readdir),
       rawFiles = await readdir(
         folderName && userPath
@@ -620,9 +620,29 @@ router.post('/delete', auth, async (req, res, next) => {
   }
 });
 
-router.get('/shared', auth, async (req, res, next) => {
+router.get('/sharedwith', auth, async (req, res, next) => {
   try {
     const shared = await Shared.find({ sharedWith: req.user }).populate(
+      'sharedBy sharedWith',
+    );
+
+    res.json({
+      success: true,
+      shared,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.get('/sharedby', auth, async (req, res, next) => {
+  try {
+    const shared = await Shared.find({ sharedBy: req.user }).populate(
       'sharedBy sharedWith',
     );
 
