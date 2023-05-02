@@ -597,41 +597,38 @@ router.post('/shared', auth, async (req, res, next) => {
 router.post('/delete', auth, async (req, res, next) => {
   try {
     const { folder = false, customPath = undefined } = req.body;
+    const user = await User.findById(req.user);
+    const starredTemp = customPath.split('\\');
+    const index = starredTemp.indexOf(
+      `${user.firstName}-${user.lastName}-${user._id}`,
+    );
+    console.log(index, 'index');
+    console.log(starredTemp, 'starredTemp');
+    starredTemp.splice(starredTemp.length, index - 1, 'starred');
+    console.log(starredTemp, 'starredTemp');
 
-    console.log(customPath, 'customPath');
-    console.log(folder, 'folder');
-    if (folder == 'false') {
-      console.log('here-1');
-      const unlink = util.promisify(fs.unlink);
+    // try {
+    const unlink = util.promisify(fs.rm);
 
-      await unlink(customPath);
+    await unlink(customPath, {
+      recursive: true,
+    });
+    await unlink(starredTemp, {
+      recursive: true,
+    });
 
-      res.json({
-        success: true,
-        message: 'File deleted successfully!',
-      });
-    } else {
-      try {
-        console.log('here-2');
-        const unlink = util.promisify(fs.rm);
+    res.json({
+      success: true,
+      message: `${folder ? 'Folder' : 'File'} deleted successfully!`,
+    });
+    // } catch (error) {
+    //   console.log(error);
 
-        await unlink(customPath, {
-          recursive: true,
-        });
-
-        res.json({
-          success: true,
-          message: 'Folder deleted successfully!',
-        });
-      } catch (error) {
-        console.log(error);
-
-        res.json({
-          success: false,
-          message: 'Empty the folder first!',
-        });
-      }
-    }
+    //   res.json({
+    //     success: false,
+    //     message: 'Empty the folder first!',
+    //   });
+    // }
   } catch (error) {
     console.log(error);
 
@@ -734,6 +731,59 @@ router.post('/trash', auth, async (req, res, next) => {
   }
 });
 
+router.post('/stare', auth, async (req, res, next) => {
+  try {
+    const { oldPath, newPath } = req.body;
+    const cp = util.promisify(fs.cp);
+    const folderSize = util.promisify(getFolderSize);
+    const user = await User.findById(req.user);
+    // let userFolderTemp = user.folderPath.split('\\');
+    // let starredTemp = user.folderPath.split('\\');
+    // const mkdir = util.promisify(fs.mkdir);
+
+    // starredTemp.pop();
+    // starredTemp.splice(starredTemp.length, 0, 'starred');
+    // userFolderTemp.splice(userFolderTemp.length - 1, 0, 'starred');
+
+    // const userFolderDir = userFolderTemp.join('\\');
+    // const starredDir = starredTemp.join('\\');
+
+    // if (!fs.existsSync(starredDir)) {
+    //   await mkdir(starredDir);
+    //   await mkdir(userFolderDir);
+    // } else if (!fs.existsSync(userFolderDir)) {
+    //   await mkdir(userFolderDir);
+    // }
+
+    await cp(oldPath, newPath, { recursive: true });
+
+    const size = await folderSize(
+      path.join(
+        path.resolve('../google-drive-storage'),
+        `/${user.firstName}-${user.lastName}-${user._id}`,
+      ),
+    );
+
+    await User.findByIdAndUpdate(
+      req.user,
+      { currentStorage: size / 1024 / 1024 / 1024 },
+      { useFindAndModify: false },
+    );
+
+    res.json({
+      success: true,
+      message: 'Added to favourites!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
 router.post('/recover', auth, async (req, res, next) => {
   try {
     const { oldPath, newPath } = req.body;
@@ -758,6 +808,29 @@ router.post('/recover', auth, async (req, res, next) => {
     res.json({
       success: true,
       message: 'Recovered successfully!',
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.post('/unstare', auth, async (req, res, next) => {
+  try {
+    const { customPath } = req.body;
+    const unlink = util.promisify(fs.rm);
+
+    await unlink(customPath, {
+      recursive: true,
+    });
+
+    res.json({
+      success: true,
+      message: 'Removed from favourites!',
     });
   } catch (error) {
     console.log(error);
