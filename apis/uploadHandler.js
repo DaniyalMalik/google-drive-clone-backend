@@ -369,14 +369,76 @@ router.get('/', auth, async (req, res, next) => {
           ? path.join(user.folderPath, folderName)
           : userPath
           ? userPath
+          : customPath && folderName
+          ? path.join(customPath, folderName)
           : customPath
           ? customPath
           : user.folderPath,
       ),
       files = [],
-      folders = [];
+      folders = [],
+      favFiles = [],
+      favFolders = [];
     let file;
 
+    // favourite files & folders
+    for (let i = 0; i < rawFiles.length; i++) {
+      const readFile = util.promisify(fs.readFile);
+      const { ...stats } = await fs.promises.stat(
+        folderName && userPath
+          ? path.join(userPath, folderName, rawFiles[i])
+          : folderName
+          ? path.join(user.folderPath, folderName, rawFiles[i])
+          : userPath
+          ? path.join(userPath, rawFiles[i])
+          : customPath
+          ? path.join(customPath, rawFiles[i])
+          : path.join(user.folderPath, rawFiles[i]),
+      );
+
+      if (rawFiles[i].split('.').length === 2) {
+        file = await readFile(
+          folderName && userPath
+            ? path.join(userPath, folderName, rawFiles[i])
+            : folderName
+            ? path.join(user.folderPath, folderName, rawFiles[i])
+            : userPath
+            ? path.join(userPath, rawFiles[i])
+            : customPath
+            ? path.join(customPath, rawFiles[i])
+            : path.join(user.folderPath, rawFiles[i]),
+        );
+
+        favFiles.push(
+          path.basename(
+            folderName && userPath
+              ? path.join(userPath, folderName, rawFiles[i])
+              : folderName
+              ? path.join(user.folderPath, folderName, rawFiles[i])
+              : userPath
+              ? path.join(userPath, rawFiles[i])
+              : customPath
+              ? path.join(customPath, rawFiles[i])
+              : path.join(user.folderPath, rawFiles[i]),
+            path.extname(
+              folderName && userPath
+                ? path.join(userPath, folderName, rawFiles[i])
+                : folderName
+                ? path.join(user.folderPath, folderName, rawFiles[i])
+                : userPath
+                ? path.join(userPath, rawFiles[i])
+                : customPath
+                ? path.join(customPath, rawFiles[i])
+                : path.join(user.folderPath, rawFiles[i]),
+            ),
+          ),
+        );
+      } else {
+        favFolders.push(rawFiles[i]);
+      }
+    }
+
+    // files & folders
     for (let i = 0; i < rawFiles.length; i++) {
       const readFile = util.promisify(fs.readFile);
       const { ...stats } = await fs.promises.stat(
@@ -597,23 +659,11 @@ router.post('/shared', auth, async (req, res, next) => {
 router.post('/delete', auth, async (req, res, next) => {
   try {
     const { folder = false, customPath = undefined } = req.body;
-    const user = await User.findById(req.user);
-    const starredTemp = customPath.split('\\');
-    const index = starredTemp.indexOf(
-      `${user.firstName}-${user.lastName}-${user._id}`,
-    );
-    console.log(index, 'index');
-    console.log(starredTemp, 'starredTemp');
-    starredTemp.splice(starredTemp.length, index - 1, 'starred');
-    console.log(starredTemp, 'starredTemp');
-
-    // try {
     const unlink = util.promisify(fs.rm);
 
+    // try {
+
     await unlink(customPath, {
-      recursive: true,
-    });
-    await unlink(starredTemp, {
       recursive: true,
     });
 
@@ -687,8 +737,15 @@ router.post('/trash', auth, async (req, res, next) => {
     const user = await User.findById(req.user);
     let userFolderTemp = user.folderPath.split('\\');
     let trashTemp = user.folderPath.split('\\');
+    const unlink = util.promisify(fs.rm);
     const mkdir = util.promisify(fs.mkdir);
+    let starredTemp = oldPath.split('\\');
+    const index = starredTemp.indexOf(
+      `${user.firstName}-${user.lastName}-${user._id}`,
+    );
 
+    starredTemp.splice(index, 0, 'starred');
+    starredTemp = starredTemp.join('\\');
     trashTemp.pop();
     trashTemp.splice(trashTemp.length, 0, 'trash');
     userFolderTemp.splice(userFolderTemp.length - 1, 0, 'trash');
@@ -704,6 +761,11 @@ router.post('/trash', auth, async (req, res, next) => {
     }
 
     await rename(oldPath, newPath);
+
+    if (fs.existsSync(starredTemp))
+      await unlink(starredTemp, {
+        recursive: true,
+      });
 
     const size = await folderSize(
       path.join(
