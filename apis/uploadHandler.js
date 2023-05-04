@@ -362,7 +362,7 @@ router.get('/', auth, async (req, res, next) => {
       folderSize = util.promisify(getFolderSize),
       user = await User.findById(userId ? userId : req.user),
       readdir = util.promisify(fs.readdir),
-      rawFiles = await readdir(
+      joinedPath =
         folderName && userPath
           ? path.join(userPath, folderName)
           : folderName
@@ -374,67 +374,57 @@ router.get('/', auth, async (req, res, next) => {
           : customPath
           ? customPath
           : user.folderPath,
-      ),
+      rawFiles = await readdir(joinedPath),
       files = [],
       folders = [],
       favFiles = [],
       favFolders = [];
     let file;
 
-    // favourite files & folders
-    for (let i = 0; i < rawFiles.length; i++) {
-      const readFile = util.promisify(fs.readFile);
-      const { ...stats } = await fs.promises.stat(
-        folderName && userPath
-          ? path.join(userPath, folderName, rawFiles[i])
-          : folderName
-          ? path.join(user.folderPath, folderName, rawFiles[i])
-          : userPath
-          ? path.join(userPath, rawFiles[i])
-          : customPath
-          ? path.join(customPath, rawFiles[i])
-          : path.join(user.folderPath, rawFiles[i]),
+    if (!customPath) {
+      let starredTemp = joinedPath.split('\\');
+      const index = starredTemp.indexOf(
+        `${user.firstName}-${user.lastName}-${user._id}`,
       );
 
-      if (rawFiles[i].split('.').length === 2) {
-        file = await readFile(
-          folderName && userPath
-            ? path.join(userPath, folderName, rawFiles[i])
-            : folderName
-            ? path.join(user.folderPath, folderName, rawFiles[i])
-            : userPath
-            ? path.join(userPath, rawFiles[i])
-            : customPath
-            ? path.join(customPath, rawFiles[i])
-            : path.join(user.folderPath, rawFiles[i]),
-        );
+      starredTemp.splice(index, 0, 'starred');
+      starredTemp = starredTemp.join('\\');
 
-        favFiles.push(
-          path.basename(
+      const rawFavs = await readdir(starredTemp);
+
+      // favourite files & folders
+      for (let i = 0; i < rawFavs.length; i++) {
+        const readFile = util.promisify(fs.readFile);
+
+        if (rawFavs[i].split('.').length === 2) {
+          file = await readFile(
             folderName && userPath
-              ? path.join(userPath, folderName, rawFiles[i])
+              ? path.join(userPath, folderName, rawFavs[i])
               : folderName
-              ? path.join(user.folderPath, folderName, rawFiles[i])
+              ? path.join(user.folderPath, folderName, rawFavs[i])
               : userPath
-              ? path.join(userPath, rawFiles[i])
+              ? path.join(userPath, rawFavs[i])
               : customPath
-              ? path.join(customPath, rawFiles[i])
-              : path.join(user.folderPath, rawFiles[i]),
-            path.extname(
+              ? path.join(customPath, rawFavs[i])
+              : path.join(user.folderPath, rawFavs[i]),
+          );
+
+          favFiles.push(
+            path.basename(
               folderName && userPath
-                ? path.join(userPath, folderName, rawFiles[i])
+                ? path.join(userPath, folderName, rawFavs[i])
                 : folderName
-                ? path.join(user.folderPath, folderName, rawFiles[i])
+                ? path.join(user.folderPath, folderName, rawFavs[i])
                 : userPath
-                ? path.join(userPath, rawFiles[i])
+                ? path.join(userPath, rawFavs[i])
                 : customPath
-                ? path.join(customPath, rawFiles[i])
-                : path.join(user.folderPath, rawFiles[i]),
+                ? path.join(customPath, rawFavs[i])
+                : path.join(user.folderPath, rawFavs[i]),
             ),
-          ),
-        );
-      } else {
-        favFolders.push(rawFiles[i]);
+          );
+        } else {
+          favFolders.push(rawFavs[i]);
+        }
       }
     }
 
@@ -465,6 +455,7 @@ router.get('/', auth, async (req, res, next) => {
             ? path.join(customPath, rawFiles[i])
             : path.join(user.folderPath, rawFiles[i]),
         );
+
         files.push({
           file: file.toString('base64'),
           mimeType: mime.getType(
@@ -525,6 +516,19 @@ router.get('/', auth, async (req, res, next) => {
               : customPath
               ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
+          favourite: favFiles.includes(
+            path.basename(
+              folderName && userPath
+                ? path.join(userPath, folderName, rawFiles[i])
+                : folderName
+                ? path.join(user.folderPath, folderName, rawFiles[i])
+                : userPath
+                ? path.join(userPath, rawFiles[i])
+                : customPath
+                ? path.join(customPath, rawFiles[i])
+                : path.join(user.folderPath, rawFiles[i]),
+            ),
+          ),
         });
       } else {
         folders.push({
@@ -551,6 +555,7 @@ router.get('/', auth, async (req, res, next) => {
               : customPath
               ? path.join(customPath, rawFiles[i])
               : path.join(user.folderPath, rawFiles[i]),
+          favourite: favFolders.includes(rawFiles[i]),
         });
       }
     }
