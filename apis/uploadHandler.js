@@ -246,6 +246,20 @@ router.put('/rename', auth, async (req, res, next) => {
   try {
     const { oldPath, newPath } = req.body;
     const rename = util.promisify(fs.rename);
+    const user = await User.findById(req.user);
+    let starredTemp_1 = oldPath.split('\\');
+    let starredTemp_2 = newPath.split('\\');
+    const index_1 = starredTemp_1.indexOf(
+      `${user.firstName}-${user.lastName}-${user._id}`,
+    );
+    const index_2 = starredTemp_1.indexOf(
+      `${user.firstName}-${user.lastName}-${user._id}`,
+    );
+
+    starredTemp_1.splice(index_1, 0, 'starred');
+    starredTemp_2.splice(index_2, 0, 'starred');
+    starredTemp_1 = starredTemp_1.join('\\');
+    starredTemp_2 = starredTemp_2.join('\\');
 
     if (fs.existsSync(newPath)) {
       return res.json({
@@ -254,6 +268,10 @@ router.put('/rename', auth, async (req, res, next) => {
       });
     } else {
       await rename(oldPath, newPath);
+
+      if (fs.existsSync(starredTemp_1)) {
+        await rename(starredTemp_1, starredTemp_2);
+      }
     }
 
     res.json({
@@ -390,40 +408,20 @@ router.get('/', auth, async (req, res, next) => {
       starredTemp.splice(index, 0, 'starred');
       starredTemp = starredTemp.join('\\');
 
-      const rawFavs = await readdir(starredTemp);
+      if (fs.existsSync(starredTemp)) {
+        const rawFavs = await readdir(starredTemp);
 
-      // favourite files & folders
-      for (let i = 0; i < rawFavs.length; i++) {
-        const readFile = util.promisify(fs.readFile);
+        // favourite files & folders
+        for (let i = 0; i < rawFavs.length; i++) {
+          const readFile = util.promisify(fs.readFile);
 
-        if (rawFavs[i].split('.').length === 2) {
-          file = await readFile(
-            folderName && userPath
-              ? path.join(userPath, folderName, rawFavs[i])
-              : folderName
-              ? path.join(user.folderPath, folderName, rawFavs[i])
-              : userPath
-              ? path.join(userPath, rawFavs[i])
-              : customPath
-              ? path.join(customPath, rawFavs[i])
-              : path.join(user.folderPath, rawFavs[i]),
-          );
+          if (rawFavs[i].split('.').length === 2) {
+            file = await readFile(path.join(starredTemp, rawFavs[i]));
 
-          favFiles.push(
-            path.basename(
-              folderName && userPath
-                ? path.join(userPath, folderName, rawFavs[i])
-                : folderName
-                ? path.join(user.folderPath, folderName, rawFavs[i])
-                : userPath
-                ? path.join(userPath, rawFavs[i])
-                : customPath
-                ? path.join(customPath, rawFavs[i])
-                : path.join(user.folderPath, rawFavs[i]),
-            ),
-          );
-        } else {
-          favFolders.push(rawFavs[i]);
+            favFiles.push(path.basename(path.join(starredTemp, rawFavs[i])));
+          } else {
+            favFolders.push(rawFavs[i]);
+          }
         }
       }
     }
@@ -505,7 +503,8 @@ router.get('/', auth, async (req, res, next) => {
               : path.join(user.folderPath, rawFiles[i]),
           ),
           size: stats.size,
-          createdAt: new Date(stats.mtime).toLocaleString(),
+          createdAt: new Date(stats.ctime).toLocaleString(),
+          updatedAt: new Date(stats.atime).toLocaleString(),
           location:
             folderName && userPath
               ? path.join(userPath, folderName, rawFiles[i])
@@ -544,6 +543,7 @@ router.get('/', auth, async (req, res, next) => {
               : path.join(user.folderPath, rawFiles[i]),
           ),
           createdAt: new Date(stats.mtime).toLocaleString(),
+          updatedAt: new Date(stats.atime).toLocaleString(),
           folderName: rawFiles[i],
           location:
             folderName && userPath
@@ -737,13 +737,14 @@ router.get('/sharedby', auth, async (req, res, next) => {
 router.post('/trash', auth, async (req, res, next) => {
   try {
     const { oldPath, newPath } = req.body;
-    const rename = util.promisify(fs.rename);
+    // const rename = util.promisify(fs.rename);
     const folderSize = util.promisify(getFolderSize);
     const user = await User.findById(req.user);
-    let userFolderTemp = user.folderPath.split('\\');
-    let trashTemp = user.folderPath.split('\\');
+    // let userFolderTemp = user.folderPath.split('\\');
+    // let trashTemp = user.folderPath.split('\\');
     const unlink = util.promisify(fs.rm);
-    const mkdir = util.promisify(fs.mkdir);
+    // const mkdir = util.promisify(fs.mkdir);
+    const cp = util.promisify(fs.cp);
     let starredTemp = oldPath.split('\\');
     const index = starredTemp.indexOf(
       `${user.firstName}-${user.lastName}-${user._id}`,
@@ -751,21 +752,25 @@ router.post('/trash', auth, async (req, res, next) => {
 
     starredTemp.splice(index, 0, 'starred');
     starredTemp = starredTemp.join('\\');
-    trashTemp.pop();
-    trashTemp.splice(trashTemp.length, 0, 'trash');
-    userFolderTemp.splice(userFolderTemp.length - 1, 0, 'trash');
+    // trashTemp.pop();
+    // trashTemp.splice(trashTemp.length, 0, 'trash');
+    // userFolderTemp.splice(userFolderTemp.length - 1, 0, 'trash');
 
-    const userFolderDir = userFolderTemp.join('\\');
-    const trashDir = trashTemp.join('\\');
+    // const userFolderDir = userFolderTemp.join('\\');
+    // const trashDir = trashTemp.join('\\');
 
-    if (!fs.existsSync(trashDir)) {
-      await mkdir(trashDir);
-      await mkdir(userFolderDir);
-    } else if (!fs.existsSync(userFolderDir)) {
-      await mkdir(userFolderDir);
-    }
+    // if (!fs.existsSync(trashDir)) {
+    //   await mkdir(trashDir);
+    //   await mkdir(userFolderDir);
+    // } else if (!fs.existsSync(userFolderDir)) {
+    //   await mkdir(userFolderDir);
+    // }
 
-    await rename(oldPath, newPath);
+    // await rename(oldPath, newPath);
+    await cp(oldPath, newPath, { recursive: true });
+    await unlink(oldPath, {
+      recursive: true,
+    });
 
     if (fs.existsSync(starredTemp))
       await unlink(starredTemp, {
@@ -854,11 +859,17 @@ router.post('/stare', auth, async (req, res, next) => {
 router.post('/recover', auth, async (req, res, next) => {
   try {
     const { oldPath, newPath } = req.body;
-    const rename = util.promisify(fs.rename);
+    // const rename = util.promisify(fs.rename);
     const folderSize = util.promisify(getFolderSize);
     const user = await User.findById(req.user);
+    const cp = util.promisify(fs.cp);
+    const unlink = util.promisify(fs.rm);
 
-    await rename(oldPath, newPath);
+    // await rename(oldPath, newPath);
+    await cp(oldPath, newPath, { recursive: true });
+    await unlink(oldPath, {
+      recursive: true,
+    });
 
     const size = await folderSize(
       path.join(
@@ -866,6 +877,7 @@ router.post('/recover', auth, async (req, res, next) => {
         `/${user.firstName}-${user.lastName}-${user._id}`,
       ),
     );
+
     await User.findByIdAndUpdate(
       req.user,
       { currentStorage: size / 1024 / 1024 / 1024 },
