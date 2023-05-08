@@ -826,7 +826,7 @@ router.post('/stare', auth, async (req, res, next) => {
     // } else if (!fs.existsSync(userFolderDir)) {
     //   await mkdir(userFolderDir);
     // }
-
+    
     await cp(oldPath, newPath, { recursive: true });
 
     const size = await folderSize(
@@ -911,6 +911,54 @@ router.post('/unstare', auth, async (req, res, next) => {
       success: true,
       message: 'Removed from favourites!',
     });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.post('/moveorcopy', auth, async (req, res, next) => {
+  try {
+    const { oldPath, newPath, move = false } = req.body;
+    const cp = util.promisify(fs.cp);
+    const user = await User.findById(req.user);
+    const unlink = util.promisify(fs.rm);
+    let starredTemp = oldPath.split('\\');
+    const index = starredTemp.indexOf(
+      `${user.firstName}-${user.lastName}-${user._id}`,
+    );
+
+    starredTemp.splice(index, 0, 'starred');
+    starredTemp = starredTemp.join('\\');
+    console.log(oldPath, 'oldPath');
+    console.log(newPath, 'newPath');
+    await cp(oldPath, newPath, { recursive: true });
+
+    if (move)
+      await unlink(oldPath, {
+        recursive: true,
+      });
+
+    if (fs.existsSync(starredTemp))
+      await unlink(starredTemp, {
+        recursive: true,
+      });
+
+    if (move) {
+      res.json({
+        success: true,
+        message: 'Moved to new path successfully!',
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'Copied to new path successfully!',
+      });
+    }
   } catch (error) {
     console.log(error);
 
