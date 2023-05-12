@@ -826,7 +826,8 @@ router.post('/stare', auth, async (req, res, next) => {
     // } else if (!fs.existsSync(userFolderDir)) {
     //   await mkdir(userFolderDir);
     // }
-    
+    console.log(oldPath, 'oldPath');
+    console.log(newPath, 'newPath');
     await cp(oldPath, newPath, { recursive: true });
 
     const size = await folderSize(
@@ -923,30 +924,36 @@ router.post('/unstare', auth, async (req, res, next) => {
 
 router.post('/moveorcopy', auth, async (req, res, next) => {
   try {
-    const { oldPath, newPath, move = false } = req.body;
+    const { oldPath, newPath, move = false, folder = false } = req.body;
     const cp = util.promisify(fs.cp);
     const user = await User.findById(req.user);
     const unlink = util.promisify(fs.rm);
     let starredTemp = oldPath.split('\\');
+    let temp = oldPath.split('\\');
     const index = starredTemp.indexOf(
       `${user.firstName}-${user.lastName}-${user._id}`,
     );
+    const mkdir = util.promisify(fs.mkdir);
 
     starredTemp.splice(index, 0, 'starred');
     starredTemp = starredTemp.join('\\');
-    console.log(oldPath, 'oldPath');
-    console.log(newPath, 'newPath');
-    await cp(oldPath, newPath, { recursive: true });
 
-    if (move)
+    if (folder) mkdir(path.join(newPath, temp[temp.length - 1]));
+
+    await cp(oldPath, path.join(newPath, temp[temp.length - 1]), {
+      recursive: true,
+    });
+
+    if (move) {
       await unlink(oldPath, {
         recursive: true,
       });
 
-    if (fs.existsSync(starredTemp))
-      await unlink(starredTemp, {
-        recursive: true,
-      });
+      if (fs.existsSync(starredTemp))
+        await unlink(starredTemp, {
+          recursive: true,
+        });
+    }
 
     if (move) {
       res.json({
