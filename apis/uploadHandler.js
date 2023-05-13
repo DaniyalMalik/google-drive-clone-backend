@@ -215,22 +215,38 @@ router.post('/', auth, async (req, res, next) => {
 
 router.post('/create', auth, async (req, res, next) => {
   try {
-    const { folderName } = req.body,
+    const { folderName, createPath = undefined } = req.body,
       mkdir = util.promisify(fs.mkdir),
       user = await User.findById(req.user);
 
-    if (!fs.existsSync(path.join(user.folderPath, folderName))) {
-      await mkdir(path.join(user.folderPath, folderName));
+    if (createPath) {
+      if (!fs.existsSync(path.join(createPath, folderName))) {
+        await mkdir(path.join(createPath, folderName));
 
-      res.json({
-        success: true,
-        message: 'Folder Created Successfully!',
-      });
+        res.json({
+          success: true,
+          message: 'Folder Created Successfully!',
+        });
+      } else {
+        res.json({
+          success: false,
+          message: 'Folder already exists!',
+        });
+      }
     } else {
-      res.json({
-        success: false,
-        message: 'Folder already exists!',
-      });
+      if (!fs.existsSync(path.join(user.folderPath, folderName))) {
+        await mkdir(path.join(user.folderPath, folderName));
+
+        res.json({
+          success: true,
+          message: 'Folder Created Successfully!',
+        });
+      } else {
+        res.json({
+          success: false,
+          message: 'Folder already exists!',
+        });
+      }
     }
   } catch (error) {
     console.log(error);
