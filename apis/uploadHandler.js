@@ -296,7 +296,7 @@ router.put('/share', auth, async (req, res, next) => {
       sharedWith: payload.userId,
       sharedBy: user._id,
     });
-
+    console.log(payload, 'payload');
     if (shared && payload.wholeFolder) {
       shared.sharedPath = [user.folderPath];
 
@@ -307,6 +307,10 @@ router.put('/share', auth, async (req, res, next) => {
         !shared.sharedPath.includes(user.folderPath)
       ) {
         shared.sharedPath = shared.sharedPath.concat(payload.path);
+
+        await shared.save();
+      } else if (shared.sharedPath.includes(user.folderPath)) {
+        shared.sharedPath = [payload.path];
 
         await shared.save();
       }
@@ -325,7 +329,7 @@ router.put('/share', auth, async (req, res, next) => {
         sharedWith: payload.userId,
       });
     }
-
+    console.log(shared, 'shared');
     res.json({
       success: true,
       message: 'Shared successfully!',
