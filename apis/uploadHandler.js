@@ -872,8 +872,7 @@ router.post('/stare', auth, async (req, res, next) => {
     // } else if (!fs.existsSync(userFolderDir)) {
     //   await mkdir(userFolderDir);
     // }
-    console.log(oldPath, 'oldPath');
-    console.log(newPath, 'newPath');
+
     await cp(oldPath, newPath, { recursive: true });
 
     const size = await folderSize(
