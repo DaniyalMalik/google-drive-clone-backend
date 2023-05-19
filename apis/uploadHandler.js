@@ -607,105 +607,105 @@ router.get('/', auth, async (req, res, next) => {
   }
 });
 
-// router.post('/shared', auth, async (req, res, next) => {
-//   try {
-//     const { path, search = undefined } = req.body,
-//       folderSize = util.promisify(getFolderSize),
-//       readdir = util.promisify(fs.readdir),
-//       files = [],
-//       folders = [],
-//       readFiles = await readdir(path[0]);
-//     let file, rawFiles;
+router.post('/shared', auth, async (req, res, next) => {
+  try {
+    const { paths, search = undefined, user } = req.body,
+      folderSize = util.promisify(getFolderSize),
+      files = [],
+      readFile = util.promisify(fs.readFile),
+      folders = [];
+    let file;
 
-//     console.log(readFiles, 'readFiles');
+    for (let i = 0; i < paths.length; i++) {
+      let temp = paths[i].split('\\');
+      let index;
 
-//     for (let i = 0; i < readFiles.length; i++) {
-//       file = undefined;
-//       rawFiles = undefined;
+      index = temp.indexOf(
+        user.firstName + '-' + user.lastName + '-' + user._id,
+      );
 
-//       if (readFiles[i].split('.').length === 2) {
-//         rawFiles = [readFiles[i]];
+      temp.splice(0, index + 1);
+      temp = temp.join('\\');
 
-//         for (let i = 0; i < rawFiles.length; i++) {
-//           console.log(rawFiles[i], 'rawFiles[i]');
-//           const pattern = new RegExp(search, 'i');
+      if (temp.split('.').length === 2) {
+        const { ...stats } = await fs.promises.stat(paths[i]);
 
-//           if (rawFiles[i].search(pattern) === -1) {
-//             continue;
-//           }
+        file = await readFile(paths[i]);
 
-//           const readFile = util.promisify(fs.readFile);
-//           const { ...stats } = await fs.promises.stat(rawFiles[i]);
+        files.push({
+          file: file.toString('base64'),
+          mimeType: mime.getType(path.basename(paths[i])),
+          fileName: path.basename(paths[i], path.extname(paths[i])),
+          fileNameWithExt: path.basename(paths[i]),
+          size: stats.size,
+          location: paths[i],
+        });
+      } else {
+        // readFiles = await readdir(paths[i]);
 
-//           file = await readFile(rawFiles[i]);
-//           files.push({
-//             file: file.toString('base64'),
-//             mimeType: mime.getType(path.basename(rawFiles[i])),
-//             fileName: path.basename(rawFiles[i], path.extname(rawFiles[i])),
-//             fileNameWithExt: path.basename(rawFiles[i]),
-//             size: stats.size,
-//             location: rawFiles[i],
-//           });
-//         }
-//       } else {
-//         rawFiles = readFiles[i];
-//         console.log(readFiles[i], 'readFiles[i]');
-//         const pattern = new RegExp(search, 'i');
+        // for (let j = 0; j < readFiles.length; j++) {
+        //   file = undefined;
+        //   rawFiles = undefined;
 
-//         if (rawFiles.search(pattern) === -1) {
-//           return;
-//         }
+        //   if (readFiles[j].split('.').length === 2) {
+        //     const pattern = new RegExp(search, 'i');
 
-//         // rawFiles = await readdir(readFiles[i]);
+        //     if (readFiles[j].search(pattern) === -1) {
+        //       continue;
+        //     }
 
-//         // for (let j = 0; j < rawFiles.length; j++) {
-//         //   const readFile = util.promisify(fs.readFile);
-//         //   console.log(readFiles[i], 'readFiles[i]');
-//         //   console.log(rawFiles[j], 'rawFiles[j]');
-//         //   if (rawFiles[j].split('.').length === 2) {
-//         //     const { ...stats } = await fs.promises.stat(
-//         //       path.join(readFiles[i], rawFiles[j]),
-//         //     );
+        //     const { ...stats } = await fs.promises.stat(
+        //       paths[i] + '\\' + readFiles[j],
+        //     );
 
-//         //     file = await readFile(path.join(readFiles[i], rawFiles[j]));
-//         //     files.push({
-//         //       file: file.toString('base64'),
-//         //       mimeType: mime.getType(
-//         //         path.basename(path.join(readFiles[i], rawFiles[j])),
-//         //       ),
-//         //       fileName: path.basename(
-//         //         path.join(readFiles[i], rawFiles[j]),
-//         //         path.extname(path.join(readFiles[i], rawFiles[j])),
-//         //       ),
-//         //       fileNameWithExt: path.basename(path.join(readFiles[i], rawFiles[j])),
-//         //       size: stats.size,
-//         //       location: path.join(readFiles[i], rawFiles[j]),
-//         //     });
-//         //   } else {
-//         folders.push({
-//           size: await folderSize(rawFiles),
-//           folderName: rawFiles,
-//           location: rawFiles,
-//         });
-//         //     }
-//         //   }
-//       }
-//     }
+        //     file = await readFile(paths[i] + '\\' + readFiles[j]);
+        //     files.push({
+        //       file: file.toString('base64'),
+        //       mimeType: mime.getType(
+        //         path.basename(paths[i] + '\\' + readFiles[j]),
+        //       ),
+        //       fileName: path.basename(
+        //         paths[i] + '\\' + readFiles[j],
+        //         path.extname(paths[i] + '\\' + readFiles[j]),
+        //       ),
+        //       fileNameWithExt: path.basename(paths[i] + '\\' + readFiles[j]),
+        //       size: stats.size,
+        //       location: paths[i] + '\\' + readFiles[j],
+        //     });
+        //   } else {
 
-//     res.json({
-//       success: true,
-//       files,
-//       folders,
-//     });
-//   } catch (error) {
-//     console.log(error);
+        const pattern = new RegExp(search, 'i');
 
-//     res.json({
-//       success: false,
-//       message: 'An error occurred!',
-//     });
-//   }
-// });
+        temp = temp.split('\\');
+
+        if (paths[i].search(pattern) === -1) {
+          return;
+        }
+
+        folders.push({
+          size: await folderSize(paths[i]),
+          folderName: temp[temp.length - 1],
+          location: paths[i],
+        });
+        // }
+        // }
+      }
+    }
+
+    res.json({
+      success: true,
+      files,
+      folders,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
 
 router.post('/delete', auth, async (req, res, next) => {
   try {
