@@ -394,7 +394,7 @@ router.put('/unshare', auth, async (req, res, next) => {
   }
 });
 
-router.get('/', auth, async (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
     const {
         folderName,
