@@ -607,7 +607,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/shared', auth, async (req, res, next) => {
+router.post('/shared', async (req, res, next) => {
   try {
     const { paths, search = undefined, user } = req.body,
       folderSize = util.promisify(getFolderSize),
