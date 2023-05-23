@@ -345,7 +345,7 @@ router.put('/share', auth, async (req, res, next) => {
         sharedWith: payload.userId,
       });
     }
-    console.log(shared, 'shared');
+
     res.json({
       success: true,
       message: 'Shared successfully!',

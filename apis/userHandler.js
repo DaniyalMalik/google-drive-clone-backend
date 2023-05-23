@@ -243,29 +243,6 @@ router.get('/all', auth, async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-
-    if (!user) {
-      return res.json({
-        success: false,
-        message: 'User not found!',
-      });
-    }
-
-    res.json({ success: true, user });
-  } catch (error) {
-    console.log(error);
-
-    res.json({
-      success: false,
-      message: 'An error occurred!',
-    });
-  }
-});
-
 router.post('/forgotpassword', async (req, res, next) => {
   const user = await User.findOne({ email: req.query.email });
 
@@ -410,6 +387,29 @@ router.get('/sendverifyemail', async (req, res, next) => {
       success: true,
       message: 'Verification email was sent successfully!',
     });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.json({
+        success: false,
+        message: 'User not found!',
+      });
+    }
+
+    res.json({ success: true, user });
   } catch (error) {
     console.log(error);
 
