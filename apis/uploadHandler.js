@@ -28,7 +28,12 @@ function removeDot(folderName) {
 
 const storage = multer.diskStorage({
     destination: async function (req, file, cb) {
-      const { folderName, sameFolder } = req.query;
+      const {
+        folderName,
+        sameFolder,
+        uploadFolderName = undefined,
+      } = req.query;
+
       // const folderSize = util.promisify(getFolderSize);
       const mkdir = util.promisify(fs.mkdir);
       let user;
@@ -131,12 +136,35 @@ const storage = multer.diskStorage({
         // } else {
         //   cb(new Error('Folder already exists!'), false);
         // }
-      } else if (folderName && sameFolder == 'true') {
+      } else if (folderName && sameFolder == 'true' && !uploadFolderName) {
         cb(
           null,
           path.join(
             path.resolve('../google-drive-storage'),
             `/${user.firstName}-${user.lastName}-${user._id}/${folderName}`,
+          ),
+        );
+      } else if (folderName && sameFolder == 'true' && uploadFolderName) {
+        if (
+          !fs.existsSync(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}`,
+            ),
+          )
+        )
+          mkdir(
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}`,
+            ),
+          );
+
+        cb(
+          null,
+          path.join(
+            path.resolve('../google-drive-storage'),
+            `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}`,
           ),
         );
       } else {
