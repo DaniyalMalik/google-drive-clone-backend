@@ -33,7 +33,17 @@ const storage = multer.diskStorage({
         sameFolder,
         uploadFolderName = undefined,
       } = req.query;
-
+      console.log(
+        folderName,
+        sameFolder,
+        uploadFolderName,
+        'folderName,sameFolder,uploadFolderName',
+      );
+      console.log(req.body, 'req.body');
+      console.log(req.folders, 'req.folders');
+      console.log(file, 'file');
+      console.log(file.originalname, 'file.originalname');
+      console.log(req[file.originalname], 'req[file.originalname]');
       // const folderSize = util.promisify(getFolderSize);
       const mkdir = util.promisify(fs.mkdir);
       let user;
