@@ -33,17 +33,10 @@ const storage = multer.diskStorage({
         sameFolder,
         uploadFolderName = undefined,
       } = req.query;
-      console.log(
-        folderName,
-        sameFolder,
-        uploadFolderName,
-        'folderName,sameFolder,uploadFolderName',
-      );
-      console.log(req.body, 'req.body');
-      console.log(req.folders, 'req.folders');
-      console.log(file, 'file');
-      console.log(file.originalname, 'file.originalname');
-      console.log(req[file.originalname], 'req[file.originalname]');
+
+      let folderNames = req.body.folders
+        ? JSON.parse(req.body.folders)
+        : undefined;
       // const folderSize = util.promisify(getFolderSize);
       const mkdir = util.promisify(fs.mkdir);
       let user;
@@ -117,9 +110,15 @@ const storage = multer.diskStorage({
         //     ),
         //   )
         // ) {
+        let subFolder = folderNames[file.originalname];
         let changedFolderName = folderName;
 
         if (folderName.includes('.')) changedFolderName = removeDot(folderName);
+        if (
+          folderNames[file.originalname] &&
+          folderNames[file.originalname].includes('.')
+        )
+          subFolder = removeDot(folderNames[file.originalname]);
 
         if (
           !fs.existsSync(
@@ -136,13 +135,39 @@ const storage = multer.diskStorage({
             ),
           );
 
-        cb(
-          null,
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
-          ),
-        );
+        if (subFolder)
+          if (
+            !fs.existsSync(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}/${subFolder}`,
+              ),
+            )
+          )
+            mkdir(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}/${subFolder}`,
+              ),
+            );
+
+        if (!subFolder)
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}`,
+            ),
+          );
+        else
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${changedFolderName}/${subFolder}`,
+            ),
+          );
+
         // } else {
         //   cb(new Error('Folder already exists!'), false);
         // }
@@ -155,6 +180,14 @@ const storage = multer.diskStorage({
           ),
         );
       } else if (folderName && sameFolder == 'true' && uploadFolderName) {
+        let subFolder = folderNames[file.originalname];
+
+        if (
+          folderNames[file.originalname] &&
+          folderNames[file.originalname].includes('.')
+        )
+          subFolder = removeDot(folderNames[file.originalname]);
+
         if (
           !fs.existsSync(
             path.join(
@@ -170,21 +203,82 @@ const storage = multer.diskStorage({
             ),
           );
 
-        cb(
-          null,
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}`,
-          ),
-        );
+        if (subFolder)
+          if (
+            !fs.existsSync(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}/${subFolder}`,
+              ),
+            )
+          )
+            mkdir(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}/${subFolder}`,
+              ),
+            );
+
+        if (!subFolder)
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}`,
+            ),
+          );
+        else
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${folderName}/${uploadFolderName}/${subFolder}`,
+            ),
+          );
       } else {
-        cb(
-          null,
-          path.join(
-            path.resolve('../google-drive-storage'),
-            `/${user.firstName}-${user.lastName}-${user._id}`,
-          ),
-        );
+        let subFolder = folderNames
+          ? folderNames[file.originalname]
+          : undefined;
+
+        if (
+          subFolder &&
+          folderNames[file.originalname] &&
+          folderNames[file.originalname].includes('.')
+        )
+          subFolder = removeDot(folderNames[file.originalname]);
+
+        if (subFolder)
+          if (
+            !fs.existsSync(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${subFolder}`,
+              ),
+            )
+          )
+            mkdir(
+              path.join(
+                path.resolve('../google-drive-storage'),
+                `/${user.firstName}-${user.lastName}-${user._id}/${subFolder}`,
+              ),
+            );
+
+        if (!subFolder)
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}`,
+            ),
+          );
+        else
+          cb(
+            null,
+            path.join(
+              path.resolve('../google-drive-storage'),
+              `/${user.firstName}-${user.lastName}-${user._id}/${subFolder}`,
+            ),
+          );
       }
       // } else {
       //   cb('Your have reached your maximum storage limit!', false);
