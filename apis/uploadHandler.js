@@ -526,6 +526,94 @@ router.put('/unshare', auth, async (req, res, next) => {
   }
 });
 
+router.get('/folderdirectory', async (req, res, next) => {
+  try {
+    const { userPath, folderName } = req.query,
+      readdir = util.promisify(fs.readdir),
+      files = [],
+      folderPaths = [],
+      folders = [];
+    let file,
+      rawFiles = await readdir(path.join(userPath, folderName));
+
+    for (let i = 0; i < rawFiles.length; i++) {
+      const readFile = util.promisify(fs.readFile);
+
+      if (rawFiles[i].split('.').length === 2) {
+        file = await readFile(path.join(userPath, folderName, rawFiles[i]));
+        files.push({
+          file: file.toString('base64'),
+          mimeType: mime.getType(
+            path.basename(path.join(userPath, folderName, rawFiles[i])),
+          ),
+          fileName: path.basename(
+            path.join(userPath, folderName, rawFiles[i]),
+            path.extname(path.join(userPath, folderName, rawFiles[i])),
+          ),
+          fileNameWithExt: path.basename(
+            path.join(userPath, folderName, rawFiles[i]),
+          ),
+          location: path.join(userPath, folderName, rawFiles[i]),
+        });
+      } else {
+        folderPaths.push(path.join(userPath, folderName, rawFiles[i]));
+        folders.push(folderName + '/' + rawFiles[i]);
+      }
+    }
+
+    for (let i = 0; i < folderPaths.length; i++) {
+      rawFiles = await readdir(folderPaths[i]);
+
+      for (let j = 0; j < rawFiles.length; j++) {
+        const readFile = util.promisify(fs.readFile);
+
+        if (rawFiles[j].split('.').length === 2) {
+          file = await readFile(path.join(folderPaths[i], rawFiles[j]));
+
+          files.push({
+            file: file.toString('base64'),
+            mimeType: mime.getType(
+              path.basename(path.join(folderPaths[i], rawFiles[j])),
+            ),
+            fileName: path.basename(
+              path.join(folderPaths[i], rawFiles[j]),
+              path.extname(path.join(folderPaths[i], rawFiles[j])),
+            ),
+            fileNameWithExt: path.basename(
+              path.join(folderPaths[i], rawFiles[j]),
+            ),
+            location: path.join(folderPaths[i], rawFiles[j]),
+          });
+        } else {
+          let temp = folderPaths[i].split(userPath);
+
+          temp.shift();
+          temp = temp[0];
+          temp = temp.split('\\');
+          temp.shift();
+          temp = temp.join('/');
+
+          folderPaths.push(path.join(folderPaths[i], rawFiles[j]));
+          folders.push(temp + '/' + rawFiles[j]);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      files,
+      folders,
+    });
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      success: false,
+      message: 'An error occurred!',
+    });
+  }
+});
+
 router.get('/', async (req, res, next) => {
   try {
     const {
