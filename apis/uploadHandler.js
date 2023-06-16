@@ -336,7 +336,7 @@ router.post('/', auth, async (req, res, next) => {
       });
     });
   } catch (error) {
-    console.log(error, 'error');
+    console.log(error);
 
     res.json({
       success: false,
@@ -444,7 +444,7 @@ router.put('/share', auth, async (req, res, next) => {
       sharedWith: payload.userId,
       sharedBy: user._id,
     });
-    console.log(payload, 'payload');
+
     if (shared && payload.wholeFolder) {
       shared.sharedPath = [user.folderPath];
 
@@ -528,36 +528,40 @@ router.put('/unshare', auth, async (req, res, next) => {
 
 router.get('/folderdirectory', async (req, res, next) => {
   try {
-    const { userPath, folderName } = req.query,
+    const { userPath, folderName, customPath, userFolder } = req.query,
       readdir = util.promisify(fs.readdir),
       files = [],
       folderPaths = [],
-      folders = [];
+      folders = [],
+      joinedPath = customPath ? customPath : path.join(userPath, folderName);
     let file,
-      rawFiles = await readdir(path.join(userPath, folderName));
+      rawFiles = await readdir(joinedPath),
+      tempPath = joinedPath.split('\\'),
+      index = tempPath.indexOf(userFolder);
+
+    tempPath.splice(0, index + 1);
+    tempPath = tempPath.join('/');
 
     for (let i = 0; i < rawFiles.length; i++) {
       const readFile = util.promisify(fs.readFile);
 
       if (rawFiles[i].split('.').length === 2) {
-        file = await readFile(path.join(userPath, folderName, rawFiles[i]));
+        file = await readFile(path.join(joinedPath, rawFiles[i]));
         files.push({
           file: file.toString('base64'),
           mimeType: mime.getType(
-            path.basename(path.join(userPath, folderName, rawFiles[i])),
+            path.basename(path.join(joinedPath, rawFiles[i])),
           ),
           fileName: path.basename(
-            path.join(userPath, folderName, rawFiles[i]),
-            path.extname(path.join(userPath, folderName, rawFiles[i])),
+            path.join(joinedPath, rawFiles[i]),
+            path.extname(path.join(joinedPath, rawFiles[i])),
           ),
-          fileNameWithExt: path.basename(
-            path.join(userPath, folderName, rawFiles[i]),
-          ),
-          location: path.join(userPath, folderName, rawFiles[i]),
+          fileNameWithExt: path.basename(path.join(joinedPath, rawFiles[i])),
+          location: path.join(joinedPath, rawFiles[i]),
         });
       } else {
-        folderPaths.push(path.join(userPath, folderName, rawFiles[i]));
-        folders.push(folderName + '/' + rawFiles[i]);
+        folderPaths.push(path.join(joinedPath, rawFiles[i]));
+        folders.push(customPath ? tempPath : folderName + '/' + rawFiles[i]);
       }
     }
 
@@ -833,8 +837,9 @@ router.post('/shared', async (req, res, next) => {
       folderSize = util.promisify(getFolderSize),
       files = [],
       readFile = util.promisify(fs.readFile),
+      readdir = util.promisify(fs.readdir),
       folders = [];
-    let file;
+    let file, readFiles, rawFiles;
 
     for (let i = 0; i < paths.length; i++) {
       let temp = paths[i].split('\\');
@@ -860,51 +865,54 @@ router.post('/shared', async (req, res, next) => {
           size: stats.size,
           location: paths[i],
         });
-      } else {
-        // readFiles = await readdir(paths[i]);
+        // } else {
+        //   readFiles = await readdir(paths[i]);
 
-        // for (let j = 0; j < readFiles.length; j++) {
-        //   file = undefined;
-        //   rawFiles = undefined;
+        //   for (let j = 0; j < readFiles.length; j++) {
+        //     file = undefined;
+        //     rawFiles = undefined;
 
-        //   if (readFiles[j].split('.').length === 2) {
-        //     const pattern = new RegExp(search, 'i');
+        //     if (readFiles[j].split('.').length === 2) {
+        //       const pattern = new RegExp(search, 'i');
 
-        //     if (readFiles[j].search(pattern) === -1) {
-        //       continue;
-        //     }
+        //       if (readFiles[j].search(pattern) === -1) {
+        //         continue;
+        //       }
 
-        //     const { ...stats } = await fs.promises.stat(
-        //       paths[i] + '\\' + readFiles[j],
-        //     );
-
-        //     file = await readFile(paths[i] + '\\' + readFiles[j]);
-        //     files.push({
-        //       file: file.toString('base64'),
-        //       mimeType: mime.getType(
-        //         path.basename(paths[i] + '\\' + readFiles[j]),
-        //       ),
-        //       fileName: path.basename(
+        //       const { ...stats } = await fs.promises.stat(
         //         paths[i] + '\\' + readFiles[j],
-        //         path.extname(paths[i] + '\\' + readFiles[j]),
-        //       ),
-        //       fileNameWithExt: path.basename(paths[i] + '\\' + readFiles[j]),
-        //       size: stats.size,
-        //       location: paths[i] + '\\' + readFiles[j],
-        //     });
-        //   } else {
+        //       );
 
+        //       file = await readFile(paths[i] + '\\' + readFiles[j]);
+        //       files.push({
+        //         file: file.toString('base64'),
+        //         mimeType: mime.getType(
+        //           path.basename(paths[i] + '\\' + readFiles[j]),
+        //         ),
+        //         fileName: path.basename(
+        //           paths[i] + '\\' + readFiles[j],
+        //           path.extname(paths[i] + '\\' + readFiles[j]),
+        //         ),
+        //         fileNameWithExt: path.basename(paths[i] + '\\' + readFiles[j]),
+        //         size: stats.size,
+        //         location: paths[i] + '\\' + readFiles[j],
+        //       });
+      } else {
         const pattern = new RegExp(search, 'i');
 
-        temp = temp.split('\\');
+        temp.includes('\\') && (temp = temp.split('\\'));
 
-        if (paths[i].search(pattern) === -1) {
+        if (typeof temp === 'object' && temp[1].search(pattern) === -1) {
+          return;
+        }
+
+        if (typeof temp === 'string' && temp.search(pattern) === -1) {
           return;
         }
 
         folders.push({
           size: await folderSize(paths[i]),
-          folderName: temp[temp.length - 1],
+          folderName: typeof temp === 'object' ? temp[1] : temp,
           location: paths[i],
         });
         // }
