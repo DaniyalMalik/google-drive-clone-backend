@@ -589,14 +589,13 @@ router.get('/folderdirectory', async (req, res, next) => {
             location: path.join(folderPaths[i], rawFiles[j]),
           });
         } else {
-          let temp = folderPaths[i].split(userPath);
+          let temp = folderPaths[i].split(userFolder ? userFolder : userPath);
 
           temp.shift();
           temp = temp[0];
           temp = temp.split('\\');
           temp.shift();
           temp = temp.join('/');
-
           folderPaths.push(path.join(folderPaths[i], rawFiles[j]));
           folders.push(temp + '/' + rawFiles[j]);
         }
@@ -837,9 +836,8 @@ router.post('/shared', async (req, res, next) => {
       folderSize = util.promisify(getFolderSize),
       files = [],
       readFile = util.promisify(fs.readFile),
-      readdir = util.promisify(fs.readdir),
       folders = [];
-    let file, readFiles, rawFiles;
+    let file;
 
     for (let i = 0; i < paths.length; i++) {
       let temp = paths[i].split('\\');
@@ -853,6 +851,12 @@ router.post('/shared', async (req, res, next) => {
       temp = temp.join('\\');
 
       if (temp.split('.').length === 2) {
+        console.log(paths[i], 'paths[i]');
+        const pattern = new RegExp(search, 'i');
+        if (paths[i].search(pattern) === -1) {
+          return;
+        }
+
         const { ...stats } = await fs.promises.stat(paths[i]);
 
         file = await readFile(paths[i]);
@@ -901,15 +905,15 @@ router.post('/shared', async (req, res, next) => {
         const pattern = new RegExp(search, 'i');
 
         temp.includes('\\') && (temp = temp.split('\\'));
-
+        console.log(temp, 'temp');
         if (typeof temp === 'object' && temp[1].search(pattern) === -1) {
-          return;
+          continue;
         }
 
         if (typeof temp === 'string' && temp.search(pattern) === -1) {
-          return;
+          continue;
         }
-
+        console.log('here!!!');
         folders.push({
           size: await folderSize(paths[i]),
           folderName: typeof temp === 'object' ? temp[1] : temp,
