@@ -403,6 +403,24 @@ router.put('/rename', auth, async (req, res, next) => {
     const index_2 = starredTemp_1.indexOf(
       `${user.firstName}-${user.lastName}-${user._id}`,
     );
+    const shareds = await Shared.find({ sharedBy: req.user }).lean();
+
+    for (let i = 0; i < shareds.length; i++) {
+      if (shareds[i].sharedPath.includes(oldPath)) {
+        let shared = { ...shareds[i] };
+        let index = shared.sharedPath.indexOf(oldPath);
+
+        shared.sharedPath.splice(index, 1, newPath);
+
+        await Shared.findByIdAndUpdate(
+          shared._id,
+          {
+            sharedPath: shared.sharedPath,
+          },
+          { useFindAndModify: false },
+        );
+      }
+    }
 
     starredTemp_1.splice(index_1, 0, 'starred');
     starredTemp_2.splice(index_2, 0, 'starred');
@@ -1027,6 +1045,26 @@ router.post('/trash', auth, async (req, res, next) => {
     const index = starredTemp.indexOf(
       `${user.firstName}-${user.lastName}-${user._id}`,
     );
+    const shareds = await Shared.find({ sharedBy: req.user }).lean();
+
+    for (let i = 0; i < shareds.length; i++) {
+      if (shareds[i].sharedPath.includes(oldPath)) {
+        let shared = { ...shareds[i] };
+        let index = shared.sharedPath.indexOf(oldPath);
+
+        shared.sharedPath.splice(index, 1);
+
+        if (shared.sharedPath.length > 0)
+          await Shared.findByIdAndUpdate(
+            shared._id,
+            {
+              sharedPath: shared.sharedPath,
+            },
+            { useFindAndModify: false },
+          );
+        else await Shared.findByIdAndDelete(shared._id);
+      }
+    }
 
     starredTemp.splice(index, 0, 'starred');
     starredTemp = starredTemp.join('\\');
@@ -1222,6 +1260,23 @@ router.post('/moveorcopy', auth, async (req, res, next) => {
     });
 
     if (move) {
+      const shareds = await Shared.find({ sharedBy: req.user }).lean();
+
+      for (let i = 0; i < shareds.length; i++) {
+        if (shareds[i].sharedPath.includes(oldPath)) {
+          let shared = { ...shareds[i] };
+          let index = shared.sharedPath.indexOf(oldPath);
+
+          shared.sharedPath.splice(index, 1);
+
+          if (shared.sharedPath.length > 0)
+            await Shared.findByIdAndUpdate(shared._id, {
+              sharedPath: shared.sharedPath,
+            });
+          else await Shared.findByIdAndDelete(shared._id);
+        }
+      }
+
       await unlink(oldPath, {
         recursive: true,
       });
