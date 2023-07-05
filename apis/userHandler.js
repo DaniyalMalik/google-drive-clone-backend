@@ -2,7 +2,10 @@ const express = require('express'),
   User = require('../models/User'),
   bcrypt = require('bcryptjs'),
   jwt = require('jsonwebtoken'),
+  fs = require('fs'),
+  path = require('path'),
   sendEmail = require('../config/sendEmail'),
+  util = require('util'),
   crypto = require('crypto'),
   { auth } = require('../middleware/auth'),
   router = express.Router();
@@ -131,21 +134,33 @@ router.delete('/:id', auth, async (req, res, next) => {
 router.put('/:id', auth, async (req, res, next) => {
   try {
     const { id } = req.params,
+      rename = util.promisify(fs.rename),
+      oldUser = await User.findById(id),
+      oldFolder = path.join(
+        path.resolve('../google-drive-storage'),
+        `/${oldUser.firstName}-${oldUser.lastName}-${oldUser._id}`,
+      ),
       updUser = req.body,
-      user = await User.findByIdAndUpdate(id, updUser, {
+      newUser = await User.findByIdAndUpdate(id, updUser, {
         new: true,
         runValidators: true,
         useFindAndModify: false,
-      });
+      }),
+      newFolder = path.join(
+        path.resolve('../google-drive-storage'),
+        `/${newUser.firstName}-${newUser.lastName}-${newUser._id}`,
+      );
 
-    if (!user) {
+    await rename(oldFolder, newFolder);
+
+    if (!newUser) {
       return res.json({
         success: false,
         message: 'User not found!',
       });
     }
 
-    res.json({ success: true, message: 'User Updated!', user });
+    res.json({ success: true, message: 'User Updated!', newUser });
   } catch (error) {
     console.log(error);
 
